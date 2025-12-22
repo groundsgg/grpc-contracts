@@ -1,0 +1,68 @@
+name: Publish Packages
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ["player", "stats"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "25"
+
+      - name: Validate version bumps
+        id: validate
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            before="${{ github.event.pull_request.base.sha }}"
+            after="${{ github.event.pull_request.head.sha }}"
+          else
+            before="${{ github.event.before }}"
+            after="${{ github.sha }}"
+          fi
+
+          project="${{ matrix.project }}"
+          publish="false"
+
+          if git diff --name-only "$before" "$after" -- "$project/" | grep -q .; then
+            if git diff -U0 "$before" "$after" -- "$project/build.gradle.kts" | grep -q -E '^[+-]version\s*='; then
+              echo "Version updated for '$project', marking for publish."
+              publish="true"
+            else
+              echo "Version not updated for '$project' but files changed."
+              exit 1
+            fi
+          fi
+
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+      - name: Publish changed project
+        if: steps.validate.outputs.publish == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ./gradlew ":${{ matrix.project }}:publish"
