@@ -1,0 +1,205 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.status;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.status";
+option java_outer_classname = "StatusProto";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+
+
+// =====================================================
+// MOTD
+// =====================================================
+
+message Motd {
+  string id = 1; // UUID
+  string name = 2;
+  string payload_json = 3; // MiniMessage / Components / Legacy JSON
+  int32 priority = 4;
+
+  google.protobuf.Timestamp starts_at = 5; // optional (seconds=0 => unset)
+  google.protobuf.Timestamp ends_at = 6;   // optional
+
+  bool enabled = 7;
+
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message CreateMotdRequest {
+  string name = 1;
+  string payload_json = 2;
+  int32 priority = 3;
+  google.protobuf.Timestamp starts_at = 4;
+  google.protobuf.Timestamp ends_at = 5;
+  bool enabled = 6;
+}
+
+message UpdateMotdRequest {
+  string id = 1;
+  string name = 2;
+  string payload_json = 3;
+  int32 priority = 4;
+  google.protobuf.Timestamp starts_at = 5;
+  google.protobuf.Timestamp ends_at = 6;
+  bool enabled = 7;
+}
+
+message GetMotdRequest {
+  string id = 1;
+}
+
+message DeleteMotdRequest {
+  string id = 1;
+}
+
+message ListMotdsRequest {
+  bool include_disabled = 1;
+}
+
+message ListMotdsResponse {
+  repeated Motd motds = 1;
+}
+
+message GetActiveMotdRequest {
+  google.protobuf.Timestamp now = 1; // optional, default = server time
+}
+
+message GetActiveMotdResponse {
+  Motd motd = 1; // empty => proxy fallback
+}
+
+
+// =====================================================
+// MAINTENANCE
+// =====================================================
+
+message MaintenanceConfig {
+  bool enabled = 1;
+  string message = 2;
+
+  google.protobuf.Timestamp starts_at = 3; // optional
+  google.protobuf.Timestamp ends_at = 4;   // optional
+
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message GetMaintenanceRequest {}
+
+message GetMaintenanceResponse {
+  MaintenanceConfig config = 1;
+}
+
+message SetMaintenanceRequest {
+  bool enabled = 1;
+  string message = 2;
+  google.protobuf.Timestamp starts_at = 3;
+  google.protobuf.Timestamp ends_at = 4;
+}
+
+message WhitelistEntry {
+  string uuid = 1;
+  string note = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message AddWhitelistRequest {
+  string uuid = 1;
+  string note = 2;
+}
+
+message RemoveWhitelistRequest {
+  string uuid = 1;
+}
+
+message ListWhitelistRequest {}
+
+message ListWhitelistResponse {
+  repeated WhitelistEntry entries = 1;
+}
+
+
+// =====================================================
+// PROXY HEARTBEAT
+// =====================================================
+
+message ProxyHeartbeat {
+  string proxy_id = 1;
+  int32 player_count = 2;
+  bool healthy = 3;
+  string version = 4;
+
+  // optional metadata (region, node, etc.)
+  map<string, string> meta = 5;
+
+  google.protobuf.Timestamp sent_at = 6;
+}
+
+message SendHeartbeatRequest {
+  ProxyHeartbeat heartbeat = 1;
+}
+
+message SendHeartbeatResponse {
+  google.protobuf.Timestamp received_at = 1;
+}
+
+
+// =====================================================
+// STATUS SYNC / STREAMING
+// =====================================================
+
+message StatusSnapshot {
+  Motd active_motd = 1;
+  MaintenanceConfig maintenance = 2;
+  google.protobuf.Timestamp generated_at = 3;
+}
+
+enum StatusEventType {
+  STATUS_EVENT_TYPE_UNSPECIFIED = 0;
+  STATUS_EVENT_TYPE_SNAPSHOT = 1;
+  STATUS_EVENT_TYPE_MOTD_CHANGED = 2;
+  STATUS_EVENT_TYPE_MAINTENANCE_CHANGED = 3;
+}
+
+message StatusEvent {
+  StatusEventType type = 1;
+  StatusSnapshot snapshot = 2;
+  google.protobuf.Timestamp emitted_at = 3;
+}
+
+message SubscribeStatusRequest {
+  string proxy_id = 1;
+}
+
+
+// =====================================================
+// SERVICE
+// =====================================================
+
+service StatusService {
+
+  // ---------- MOTD ----------
+  rpc CreateMotd(CreateMotdRequest) returns (Motd);
+  rpc UpdateMotd(UpdateMotdRequest) returns (Motd);
+  rpc GetMotd(GetMotdRequest) returns (Motd);
+  rpc DeleteMotd(DeleteMotdRequest) returns (google.protobuf.Empty);
+  rpc ListMotds(ListMotdsRequest) returns (ListMotdsResponse);
+  rpc GetActiveMotd(GetActiveMotdRequest) returns (GetActiveMotdResponse);
+
+  // ---------- MAINTENANCE ----------
+  rpc GetMaintenance(GetMaintenanceRequest) returns (GetMaintenanceResponse);
+  rpc SetMaintenance(SetMaintenanceRequest) returns (GetMaintenanceResponse);
+
+  rpc AddWhitelist(AddWhitelistRequest) returns (WhitelistEntry);
+  rpc RemoveWhitelist(RemoveWhitelistRequest) returns (google.protobuf.Empty);
+  rpc ListWhitelist(ListWhitelistRequest) returns (ListWhitelistResponse);
+
+  // ---------- PROXY ----------
+  rpc SendHeartbeat(SendHeartbeatRequest) returns (SendHeartbeatResponse);
+
+  // ---------- SYNC ----------
+  rpc SubscribeStatus(SubscribeStatusRequest) returns (stream StatusEvent);
+}
