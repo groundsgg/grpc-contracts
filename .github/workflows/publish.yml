@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        project: ["player", "stats"]
+        project: ["player", "stats", "status"]
     steps:
       - name: Checkout
         uses: actions/checkout@v6
