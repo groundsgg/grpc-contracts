@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.status;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.status";
+option java_outer_classname = "ProxyProto";
+
+import "google/protobuf/timestamp.proto";
+
+
+message ProxyHeartbeat {
+  string proxy_id = 1;
+  int32 player_count = 2;
+  bool healthy = 3;
+  string version = 4;
+
+  // optional metadata (region, node, etc.)
+  map<string, string> meta = 5;
+
+  google.protobuf.Timestamp sent_at = 6;
+}
+
+message SendHeartbeatRequest {
+  ProxyHeartbeat heartbeat = 1;
+}
+
+message SendHeartbeatResponse {
+  google.protobuf.Timestamp received_at = 1;
+}
+
+// Proxy status derived by the service from heartbeats.
+// "online" is computed based on last_seen_at and the configured timeout.
+message ProxyStatus {
+  string proxy_id = 1;
+  bool online = 2;
+  int32 player_count = 3;
+  google.protobuf.Timestamp last_seen_at = 4;
+}

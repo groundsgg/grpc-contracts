@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.status;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.status";
+option java_outer_classname = "MaintenanceProto";
+
+import "google/protobuf/timestamp.proto";
+
+
+message MaintenanceConfig {
+  bool enabled = 1;
+  string message = 2;
+
+  google.protobuf.Timestamp starts_at = 3; // optional
+  google.protobuf.Timestamp ends_at = 4;   // optional
+
+  google.protobuf.Timestamp updated_at = 5;
+
+  // derived by service:
+  // enabled == true OR now within [starts_at, ends_at]
+  bool effective_enabled = 6;
+}
+
+message GetMaintenanceRequest {}
+
+message GetMaintenanceResponse {
+  MaintenanceConfig config = 1;
+}
+
+message SetMaintenanceRequest {
+  bool enabled = 1;
+  string message = 2;
+  google.protobuf.Timestamp starts_at = 3;
+  google.protobuf.Timestamp ends_at = 4;
+}
+
+message WhitelistEntry {
+  string uuid = 1;
+  string note = 2;
+  google.protobuf.Timestamp created_at = 3;
+}
+
+message AddWhitelistRequest {
+  string uuid = 1;
+  string note = 2;
+}
+
+message RemoveWhitelistRequest {
+  string uuid = 1;
+}
+
+message ListWhitelistRequest {}
+
+message ListWhitelistResponse {
+  repeated WhitelistEntry entries = 1;
+}

@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.status;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.status";
+option java_outer_classname = "SnapshotProto";
+
+import "google/protobuf/timestamp.proto";
+
+import "motd.proto";
+import "maintenance.proto";
+import "proxy.proto";
+
+
+message StatusSnapshot {
+  Motd active_motd = 1;
+  MaintenanceConfig maintenance = 2;
+
+  google.protobuf.Timestamp generated_at = 3;
+
+  // Full whitelist needed for join decisions during maintenance.
+  repeated WhitelistEntry whitelist = 4;
+
+  // Derived proxy status from heartbeats.
+  repeated ProxyStatus proxies = 5;
+}
+
+enum StatusEventType {
+  STATUS_EVENT_TYPE_UNSPECIFIED = 0;
+  STATUS_EVENT_TYPE_SNAPSHOT = 1;
+  STATUS_EVENT_TYPE_MOTD_CHANGED = 2;
+  STATUS_EVENT_TYPE_MAINTENANCE_CHANGED = 3;
+
+  // Optional for later: emit when proxy online/offline changes.
+  // STATUS_EVENT_TYPE_PROXY_STATUS_CHANGED = 4;
+}
+
+message StatusEvent {
+  StatusEventType type = 1;
+  StatusSnapshot snapshot = 2;
+  google.protobuf.Timestamp emitted_at = 3;
+}
+
+message SubscribeStatusRequest {
+  string proxy_id = 1;
+}

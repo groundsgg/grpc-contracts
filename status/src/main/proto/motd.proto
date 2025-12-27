@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.status;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.status";
+option java_outer_classname = "MotdProto";
+
+import "google/protobuf/timestamp.proto";
+
+
+message Motd {
+  string id = 1; // UUID
+  string name = 2;
+  string payload_json = 3; // MiniMessage / Components / Legacy JSON
+  int32 priority = 4;
+
+  google.protobuf.Timestamp starts_at = 5; // optional (seconds=0 => unset)
+  google.protobuf.Timestamp ends_at = 6;   // optional
+
+  bool enabled = 7;
+
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message CreateMotdRequest {
+  string name = 1;
+  string payload_json = 2;
+  int32 priority = 3;
+  google.protobuf.Timestamp starts_at = 4;
+  google.protobuf.Timestamp ends_at = 5;
+  bool enabled = 6;
+}
+
+message UpdateMotdRequest {
+  string id = 1;
+  string name = 2;
+  string payload_json = 3;
+  int32 priority = 4;
+  google.protobuf.Timestamp starts_at = 5;
+  google.protobuf.Timestamp ends_at = 6;
+  bool enabled = 7;
+}
+
+message GetMotdRequest {
+  string id = 1;
+}
+
+message DeleteMotdRequest {
+  string id = 1;
+}
+
+message ListMotdsRequest {
+  bool include_disabled = 1;
+}
+
+message ListMotdsResponse {
+  repeated Motd motds = 1;
+}
+
+message GetActiveMotdRequest {
+  google.protobuf.Timestamp now = 1; // optional, default = server time
+}
+
+message GetActiveMotdResponse {
+  Motd motd = 1; // empty => proxy fallback
+}
