@@ -1,1 +1,2 @@
-version="0.0.3"
+val versionOverride = project.findProperty("versionOverride") as String?
+version = versionOverride ?: "0.0.3"
