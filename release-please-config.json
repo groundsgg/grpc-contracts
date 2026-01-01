@@ -7,9 +7,6 @@
     "player": {
       "package-name": "player"
     },
-    "stats": {
-      "package-name": "stats"
-    },
     "status": {
       "package-name": "status"
     }

@@ -1,3 +1,3 @@
 rootProject.name = "grpc-contracts"
 
-include("player", "stats", "status")
+include("player", "status")

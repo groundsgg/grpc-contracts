@@ -43,12 +43,6 @@ jobs:
           tag_package="${tag_name%%@*}"
           tag_version="${tag_name#*@}"
 
-          # Validate package name
-          if [[ ! "$tag_package" =~ ^(player|stats|status)$ ]]; then
-            echo "Error: Invalid package name: $tag_package"
-            exit 1
-          fi
-
           echo "package=$tag_package" >> "$GITHUB_OUTPUT"
           echo "version=$tag_version" >> "$GITHUB_OUTPUT"
 
