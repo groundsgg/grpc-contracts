@@ -56,13 +56,18 @@ jobs:
           if [[ "$ref" == refs/heads/main ]]; then
             # Main branch: SNAPSHOT version
             snapshot_version="main-SNAPSHOT"
+            echo "Found changes in project $project on main branch. Using version $snapshot_version"
             echo "version=$snapshot_version" >> "$GITHUB_OUTPUT"
           elif [[ "$ref" == refs/heads/feat/* ]] || [[ "$ref" == refs/heads/fix/* ]] || [[ "$ref" == refs/heads/refactor/* ]]; then
             # Feature branch: SNAPSHOT with branch name
             branch_name="${ref#refs/heads/}"
             sanitized_branch=$(echo "$branch_name" | sed 's/[^a-zA-Z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
             snapshot_version="${sanitized_branch}-SNAPSHOT"
+            echo "Found changes in project $project on branch $branch_name. Using version $snapshot_version"
             echo "version=$snapshot_version" >> "$GITHUB_OUTPUT"
+          else
+            echo "No version determined for branch $ref"
+            echo "version=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish package

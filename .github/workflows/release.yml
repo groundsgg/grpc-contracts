@@ -39,9 +39,11 @@ jobs:
             exit 1
           fi
 
-          # Extract package name and version from tag (e.g., player@1.0.0)
+          # Extract package name and version from tag (e.g., player@v1.0.0)
           tag_package="${tag_name%%@*}"
-          tag_version="${tag_name#*@}"
+          tag_version="${tag_name#*@v}"
+
+          echo "Extracted package=$tag_package version=$tag_version"
 
           echo "package=$tag_package" >> "$GITHUB_OUTPUT"
           echo "version=$tag_version" >> "$GITHUB_OUTPUT"
@@ -53,4 +55,3 @@ jobs:
           VERSION_OVERRIDE: ${{ steps.tag_info.outputs.version }}
         run: |
           ./gradlew ":${{ steps.tag_info.outputs.package }}:publish" -PversionOverride="$VERSION_OVERRIDE"
-
