@@ -1,5 +1,5 @@
 {
-  "release-type": "gradle",
+  "release-type": "java",
   "separate-pull-requests": true,
   "tag-separator": "@",
   "include-component-in-tag": true,
