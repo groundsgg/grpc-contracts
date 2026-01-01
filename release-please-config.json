@@ -1,0 +1,17 @@
+{
+  "release-type": "gradle",
+  "separate-pull-requests": true,
+  "tag-separator": "@",
+  "include-component-in-tag": true,
+  "packages": {
+    "player": {
+      "path": "player"
+    },
+    "stats": {
+      "path": "stats"
+    },
+    "status": {
+      "path": "status"
+    }
+  }
+}

@@ -1,0 +1,73 @@
+name: Publish Branch Packages
+
+on:
+  push:
+    branches:
+      - main
+      - 'feat/**'
+      - 'fix/**'
+      - 'refactor/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ["player", "stats", "status"]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: "temurin"
+          java-version: "25"
+          cache: "gradle"
+
+      - name: 🔍 Detect changes
+        uses: tj-actions/changed-files@v47
+        id: changed-files
+        with:
+          files: |
+            ${{ matrix.project }}/**
+
+      - name: Determine version
+        if: steps.changed-files.outputs.any_changed == 'true'
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          project="${{ matrix.project }}"
+          ref="${{ github.ref }}"
+
+          # Determine version based on branch type
+          if [[ "$ref" == refs/heads/main ]]; then
+            # Main branch: SNAPSHOT version
+            snapshot_version="main-SNAPSHOT"
+            echo "version=$snapshot_version" >> "$GITHUB_OUTPUT"
+          elif [[ "$ref" == refs/heads/feat/* ]] || [[ "$ref" == refs/heads/fix/* ]] || [[ "$ref" == refs/heads/refactor/* ]]; then
+            # Feature branch: SNAPSHOT with branch name
+            branch_name="${ref#refs/heads/}"
+            sanitized_branch=$(echo "$branch_name" | sed 's/[^a-zA-Z0-9-]/-/g' | sed 's/--*/-/g' | sed 's/^-\|-$//g')
+            snapshot_version="${sanitized_branch}-SNAPSHOT"
+            echo "version=$snapshot_version" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish package
+        if: steps.changed-files.outputs.any_changed == 'true' && steps.version.outputs.version != ''
+        env:
+          GITHUB_ACTOR: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_OVERRIDE: ${{ steps.version.outputs.version }}
+        run: |
+          ./gradlew ":${{ matrix.project }}:publish" -PversionOverride="$VERSION_OVERRIDE"
