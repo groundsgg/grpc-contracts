@@ -1,3 +1,3 @@
-rootProject.name = "grpc-contracts"
+rootProject.name = "library-grpc-contracts"
 
 include("player", "status")
