@@ -6,6 +6,8 @@ option java_multiple_files = true;
 option java_package = "gg.grounds.grpc.permissions";
 option java_outer_classname = "PermissionsCommonProto";
 
+import "google/protobuf/timestamp.proto";
+
 enum ApplyResult {
   APPLY_RESULT_UNSPECIFIED = 0;
   NO_CHANGE = 1;
@@ -16,14 +18,24 @@ enum ApplyResult {
 
 message PlayerPermissions {
   string player_id = 1;
-  repeated string group_names = 2;
-  repeated string direct_permissions = 3;
+  repeated PlayerGroupMembership group_memberships = 2;
+  repeated PermissionGrant direct_permission_grants = 3;
   repeated string effective_permissions = 4;
+}
+
+message PlayerGroupMembership {
+  string group_name = 1;
+  google.protobuf.Timestamp expires_at = 2;
 }
 
 message Group {
   string group_name = 1;
-  repeated string permissions = 2;
+  repeated PermissionGrant permission_grants = 2;
+}
+
+message PermissionGrant {
+  string permission = 1;
+  google.protobuf.Timestamp expires_at = 2;
 }
 
 message GetPlayerPermissionsRequest {
@@ -65,7 +77,7 @@ message DeleteGroupReply {
 
 message AddGroupPermissionsRequest {
   string group_name = 1;
-  repeated string permissions = 2;
+  repeated PermissionGrant permission_grants = 2;
 }
 
 message AddGroupPermissionsReply {
@@ -83,7 +95,7 @@ message RemoveGroupPermissionsReply {
 
 message AddPlayerPermissionsRequest {
   string player_id = 1;
-  repeated string permissions = 2;
+  repeated PermissionGrant permission_grants = 2;
 }
 
 message AddPlayerPermissionsReply {
@@ -101,7 +113,7 @@ message RemovePlayerPermissionsReply {
 
 message AddPlayerGroupsRequest {
   string player_id = 1;
-  repeated string group_names = 2;
+  repeated PlayerGroupMembership group_memberships = 2;
 }
 
 message AddPlayerGroupsReply {
