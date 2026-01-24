@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.permissions;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.permissions";
+option java_outer_classname = "PermissionsAdminProto";
+
+import "permissions.proto";
+
+service PermissionsAdminService {
+  // Admin-facing
+  rpc CreateGroup (CreateGroupRequest) returns (CreateGroupReply);
+  rpc DeleteGroup (DeleteGroupRequest) returns (DeleteGroupReply);
+  rpc GetGroup (GetGroupRequest) returns (GetGroupReply);
+  rpc ListGroups (ListGroupsRequest) returns (ListGroupsReply);
+  rpc AddGroupPermissions (AddGroupPermissionsRequest) returns (AddGroupPermissionsReply);
+  rpc RemoveGroupPermissions (RemoveGroupPermissionsRequest) returns (RemoveGroupPermissionsReply);
+  rpc AddPlayerPermissions (AddPlayerPermissionsRequest) returns (AddPlayerPermissionsReply);
+  rpc RemovePlayerPermissions (RemovePlayerPermissionsRequest) returns (RemovePlayerPermissionsReply);
+  rpc AddPlayerGroups (AddPlayerGroupsRequest) returns (AddPlayerGroupsReply);
+  rpc RemovePlayerGroups (RemovePlayerGroupsRequest) returns (RemovePlayerGroupsReply);
+}

@@ -1,0 +1,146 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.permissions;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.permissions";
+option java_outer_classname = "PermissionsCommonProto";
+
+import "google/protobuf/timestamp.proto";
+
+enum ApplyResult {
+  APPLY_RESULT_UNSPECIFIED = 0;
+  NO_CHANGE = 1;
+  CREATED = 2;
+  UPDATED = 3;
+  DELETED = 4;
+}
+
+message PlayerPermissions {
+  string player_id = 1;
+  repeated PlayerGroupMembership group_memberships = 2;
+  repeated PermissionGrant direct_permission_grants = 3;
+  repeated string effective_permissions = 4;
+}
+
+message PlayerGroupMembership {
+  string group_name = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message Group {
+  string group_name = 1;
+  repeated PermissionGrant permission_grants = 2;
+}
+
+message PermissionGrant {
+  string permission = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message GetPlayerPermissionsRequest {
+  string player_id = 1;
+  bool include_effective_permissions = 2;
+  bool include_direct_permissions = 3;
+  bool include_groups = 4;
+}
+
+message GetPlayerPermissionsReply {
+  PlayerPermissions player = 1;
+}
+
+message CheckPlayerPermissionRequest {
+  string player_id = 1;
+  string permission = 2;
+}
+
+message CheckPlayerPermissionReply {
+  bool allowed = 1;
+}
+
+message CreateGroupRequest {
+  string group_name = 1;
+}
+
+message CreateGroupReply {
+  // Idempotent: existing group returns NO_CHANGE with OK status.
+  ApplyResult apply_result = 1;
+}
+
+message DeleteGroupRequest {
+  string group_name = 1;
+}
+
+message DeleteGroupReply {
+  ApplyResult apply_result = 1;
+}
+
+message AddGroupPermissionsRequest {
+  string group_name = 1;
+  repeated PermissionGrant permission_grants = 2;
+}
+
+message AddGroupPermissionsReply {
+  ApplyResult apply_result = 1;
+}
+
+message RemoveGroupPermissionsRequest {
+  string group_name = 1;
+  repeated string permissions = 2;
+}
+
+message RemoveGroupPermissionsReply {
+  ApplyResult apply_result = 1;
+}
+
+message AddPlayerPermissionsRequest {
+  string player_id = 1;
+  repeated PermissionGrant permission_grants = 2;
+}
+
+message AddPlayerPermissionsReply {
+  ApplyResult apply_result = 1;
+}
+
+message RemovePlayerPermissionsRequest {
+  string player_id = 1;
+  repeated string permissions = 2;
+}
+
+message RemovePlayerPermissionsReply {
+  ApplyResult apply_result = 1;
+}
+
+message AddPlayerGroupsRequest {
+  string player_id = 1;
+  repeated PlayerGroupMembership group_memberships = 2;
+}
+
+message AddPlayerGroupsReply {
+  ApplyResult apply_result = 1;
+}
+
+message RemovePlayerGroupsRequest {
+  string player_id = 1;
+  repeated string group_names = 2;
+}
+
+message RemovePlayerGroupsReply {
+  ApplyResult apply_result = 1;
+}
+
+message GetGroupRequest {
+  string group_name = 1;
+}
+
+message GetGroupReply {
+  Group group = 1;
+}
+
+message ListGroupsRequest {
+  bool include_permissions = 1;
+}
+
+message ListGroupsReply {
+  repeated Group groups = 1;
+}

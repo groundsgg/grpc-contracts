@@ -9,6 +9,9 @@
     },
     "status": {
       "package-name": "status"
+    },
+    "permission": {
+      "package-name": "permission"
     }
   }
 }
