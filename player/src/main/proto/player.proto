@@ -9,6 +9,7 @@ option java_outer_classname = "PlayerProto";
 service PlayerPresenceService {
   rpc TryPlayerLogin (PlayerLoginRequest) returns (PlayerLoginReply);
   rpc PlayerLogout (PlayerLogoutRequest) returns (PlayerLogoutReply);
+  rpc PlayerHeartbeat (PlayerHeartbeatRequest) returns (PlayerHeartbeatReply);
 }
 
 message PlayerLoginRequest {
@@ -26,6 +27,15 @@ message PlayerLogoutRequest {
 
 message PlayerLogoutReply {
   bool removed = 1;
+  string message = 2;
+}
+
+message PlayerHeartbeatRequest {
+  string player_id = 1;
+}
+
+message PlayerHeartbeatReply {
+  bool acknowledged = 1;
   string message = 2;
 }
 
