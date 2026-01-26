@@ -38,6 +38,8 @@ message PlayerHeartbeatBatchReply {
   int32 updated = 1;
   int32 missing = 2;
   string message = 3;
+  // success is true when the request is valid and processed; false for invalid requests or server errors.
+  bool success = 4;
 }
 
 enum LoginStatus {
