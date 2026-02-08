@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.config;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.config";
+option java_outer_classname = "ConfigAdminProto";
+
+import "config_service.proto";
+
+service ConfigAdminService {
+  rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse);
+  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse);
+  rpc PutDocument(PutDocumentRequest) returns (PutDocumentResponse);
+  rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
+}
+
+message ListDocumentsRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+}
+
+message ListDocumentsResponse {
+  repeated ConfigDocument documents = 1;
+}
+
+message PutDocumentRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+  string config_key = 4;
+  string content_json = 5;
+  string updated_by = 6;
+}
+
+message PutDocumentResponse {
+  int64 version = 1;
+}
+
+message DeleteDocumentRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+  string config_key = 4;
+}
+
+message DeleteDocumentResponse {
+  bool deleted = 1;
+}

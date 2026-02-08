@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.config;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.config";
+option java_outer_classname = "ConfigServiceProto";
+
+service ConfigService {
+  rpc GetSnapshot(GetSnapshotRequest) returns (GetSnapshotResponse);
+  rpc GetSnapshotIfNewer(GetSnapshotIfNewerRequest) returns (GetSnapshotResponse);
+  rpc GetNamespaceSnapshot(GetNamespaceSnapshotRequest) returns (GetSnapshotResponse);
+  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse);
+  rpc SyncDefaults(SyncDefaultsRequest) returns (SyncDefaultsResponse);
+}
+
+message ConfigDocument {
+  string namespace = 1;
+  string config_key = 2;
+  string content_json = 3;
+}
+
+message GetSnapshotRequest {
+  string app = 1;
+  string env = 2;
+}
+
+message GetSnapshotIfNewerRequest {
+  string app = 1;
+  string env = 2;
+  int64 known_version = 3;
+}
+
+message GetSnapshotResponse {
+  bool changed = 1;
+  int64 version = 2;
+  repeated ConfigDocument documents = 3;
+}
+
+message GetNamespaceSnapshotRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+}
+
+message GetDocumentRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+  string config_key = 4;
+}
+
+message GetDocumentResponse {
+  ConfigDocument document = 1;
+}
+
+message ConfigDefault {
+  string namespace = 1;
+  string config_key = 2;
+  string default_content_json = 3;
+}
+
+message SyncDefaultsRequest {
+  string app = 1;
+  string env = 2;
+  repeated ConfigDefault defaults = 3;
+}
+
+message SyncDefaultsResponse {
+  int64 version = 1;
+  repeated string created_keys = 2;
+}
