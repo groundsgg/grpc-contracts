@@ -9,6 +9,7 @@ option java_outer_classname = "PlayerProto";
 service PlayerPresenceService {
   rpc TryPlayerLogin (PlayerLoginRequest) returns (PlayerLoginReply);
   rpc PlayerLogout (PlayerLogoutRequest) returns (PlayerLogoutReply);
+  rpc PlayerHeartbeatBatch (PlayerHeartbeatBatchRequest) returns (PlayerHeartbeatBatchReply);
 }
 
 message PlayerLoginRequest {
@@ -27,6 +28,18 @@ message PlayerLogoutRequest {
 message PlayerLogoutReply {
   bool removed = 1;
   string message = 2;
+}
+
+message PlayerHeartbeatBatchRequest {
+  repeated string player_ids = 1;
+}
+
+message PlayerHeartbeatBatchReply {
+  int32 updated = 1;
+  int32 missing = 2;
+  string message = 3;
+  // success is true when the request is valid and processed; false for invalid requests or server errors.
+  bool success = 4;
 }
 
 enum LoginStatus {
