@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.1.0...player@v0.2.0) (2026-03-08)
+
+
+### Features
+
+* add player heartbeat ([#33](https://github.com/groundsgg/library-grpc-contracts/issues/33)) ([a5509f0](https://github.com/groundsgg/library-grpc-contracts/commit/a5509f071d72272230b2af3ead79196d78341872))
+
 ## [0.1.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.0.1...player@v0.1.0) (2026-01-12)
 
 
