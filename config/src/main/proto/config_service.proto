@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.config;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.config";
+option java_outer_classname = "ConfigServiceProto";
+
+// Provides read access to effective configuration snapshots and documents.
+service ConfigService {
+  // Returns the full configuration snapshot for the given app/env pair.
+  rpc GetSnapshot(GetSnapshotRequest) returns (GetSnapshotResponse);
+  // Returns the current snapshot only when the server version is newer than the client's known version.
+  rpc GetSnapshotIfNewer(GetSnapshotIfNewerRequest) returns (GetSnapshotResponse);
+  // Returns the full configuration snapshot for a single namespace.
+  rpc GetNamespaceSnapshot(GetNamespaceSnapshotRequest) returns (GetSnapshotResponse);
+  // Returns a single configuration document identified by namespace and key. Returns NOT_FOUND
+  // when no matching document exists.
+  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse);
+  // Creates missing documents from the provided defaults for the given app/env pair.
+  rpc SyncDefaults(SyncDefaultsRequest) returns (SyncDefaultsResponse);
+}
+
+message ConfigDocument {
+  string namespace = 1;
+  string config_key = 2;
+  string content_json = 3;
+  // Monotonic document version used for optimistic concurrency in administrative writes.
+  int64 version = 4;
+}
+
+message ConfigDocumentKey {
+  string namespace = 1;
+  string config_key = 2;
+}
+
+message GetSnapshotRequest {
+  string app = 1;
+  string env = 2;
+}
+
+message GetSnapshotIfNewerRequest {
+  string app = 1;
+  string env = 2;
+  // Client's last known snapshot version. The server returns changed=false with empty documents
+  // when the current server version is less than or equal to known_version.
+  int64 known_version = 3;
+}
+
+message GetSnapshotResponse {
+  // True when documents contains the current snapshot for the requested scope. False when no newer
+  // snapshot is available for conditional reads.
+  bool changed = 1;
+  // Current server snapshot version for the requested scope. This is always populated, even when
+  // changed=false.
+  int64 version = 2;
+  // Full snapshot documents for the requested scope. Empty when changed=false.
+  repeated ConfigDocument documents = 3;
+}
+
+message GetNamespaceSnapshotRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+}
+
+message GetDocumentRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+  string config_key = 4;
+}
+
+message GetDocumentResponse {
+  // Requested document. The server returns NOT_FOUND instead of an empty response when the
+  // document does not exist.
+  ConfigDocument document = 1;
+}
+
+message ConfigDefault {
+  string namespace = 1;
+  string config_key = 2;
+  string default_content_json = 3;
+}
+
+message SyncDefaultsRequest {
+  string app = 1;
+  string env = 2;
+  // Default documents to create when a document with the same namespace and key does not exist.
+  // Existing documents are left unchanged. Documents not present in defaults are not deleted.
+  repeated ConfigDefault defaults = 3;
+}
+
+message SyncDefaultsResponse {
+  // Snapshot version after applying the sync operation.
+  int64 version = 1;
+  // Keys that were created during the sync operation. Existing keys that were left unchanged are
+  // not included.
+  repeated ConfigDocumentKey created_keys = 2;
+}

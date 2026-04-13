@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.config;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.config";
+option java_outer_classname = "ConfigAdminProto";
+
+import "config_service.proto";
+
+// Provides administrative document management operations for configuration data.
+service ConfigAdminService {
+  // Lists configuration documents for the given app/env pair and optional namespace filter.
+  rpc ListDocuments(ListDocumentsRequest) returns (ListDocumentsResponse);
+  // Returns a single configuration document identified by namespace and key. Returns NOT_FOUND
+  // when no matching document exists.
+  rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse);
+  // Creates or replaces a configuration document.
+  rpc PutDocument(PutDocumentRequest) returns (PutDocumentResponse);
+  // Deletes a configuration document identified by namespace and key. The operation is idempotent.
+  rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
+}
+
+message ListDocumentsRequest {
+  string app = 1;
+  string env = 2;
+  // Empty string returns documents from all namespaces for the given app/env pair.
+  string namespace = 3;
+}
+
+message ListDocumentsResponse {
+  // Documents matching the requested filter. Each document includes its current document version,
+  // which clients can pass as expected_version to PutDocument.
+  repeated ConfigDocument documents = 1;
+}
+
+message PutDocumentRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+  string config_key = 4;
+  string content_json = 5;
+  string updated_by = 6;
+  // Expected current document version for optimistic concurrency control. Clients obtain this
+  // value from GetDocument or ListDocuments. When set, the server rejects the update with
+  // FAILED_PRECONDITION if the stored version does not match.
+  optional int64 expected_version = 7;
+}
+
+message PutDocumentResponse {
+  int64 version = 1;
+}
+
+message DeleteDocumentRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+  string config_key = 4;
+  // Actor performing the delete operation when audit identity is not derived from the auth context.
+  string deleted_by = 5;
+}
+
+message DeleteDocumentResponse {
+  // True when an existing document was deleted. False when no matching document existed.
+  bool deleted = 1;
+  // Current snapshot version after the delete request. Unchanged when deleted=false.
+  int64 version = 2;
+}
