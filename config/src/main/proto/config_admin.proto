@@ -15,7 +15,13 @@ service ConfigAdminService {
   // Returns a single configuration document identified by namespace and key. Returns NOT_FOUND
   // when no matching document exists.
   rpc GetDocument(GetDocumentRequest) returns (GetDocumentResponse);
-  // Creates or replaces a configuration document.
+  // Creates a configuration document only when no document with the same app, env, namespace,
+  // and config_key exists. Returns ALREADY_EXISTS when the target document already exists within
+  // that (app, env, namespace, config_key) scope.
+  rpc CreateDocument(CreateDocumentRequest) returns (CreateDocumentResponse);
+  // Creates or replaces a configuration document. When expected_version is set, the update only
+  // succeeds when the stored document version matches. For atomic create-if-absent semantics, use
+  // CreateDocument instead of PutDocument.
   rpc PutDocument(PutDocumentRequest) returns (PutDocumentResponse);
   // Deletes a configuration document identified by namespace and key. The operation is idempotent.
   rpc DeleteDocument(DeleteDocumentRequest) returns (DeleteDocumentResponse);
@@ -34,6 +40,21 @@ message ListDocumentsResponse {
   repeated ConfigDocument documents = 1;
 }
 
+message CreateDocumentRequest {
+  string app = 1;
+  string env = 2;
+  string namespace = 3;
+  string config_key = 4;
+  string content_json = 5;
+  string updated_by = 6;
+}
+
+message CreateDocumentResponse {
+  // Version of the newly created document. Clients can use this as expected_version in
+  // PutDocument for optimistic concurrency control. This is not a snapshot version.
+  int64 version = 1;
+}
+
 message PutDocumentRequest {
   string app = 1;
   string env = 2;
@@ -43,7 +64,8 @@ message PutDocumentRequest {
   string updated_by = 6;
   // Expected current document version for optimistic concurrency control. Clients obtain this
   // value from GetDocument or ListDocuments. When set, the server rejects the update with
-  // FAILED_PRECONDITION if the stored version does not match.
+  // FAILED_PRECONDITION if the stored version does not match, or NOT_FOUND if the document does
+  // not exist. This field must be omitted for unconditional upserts.
   optional int64 expected_version = 7;
 }
 

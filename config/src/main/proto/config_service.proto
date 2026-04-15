@@ -6,6 +6,12 @@ option java_multiple_files = true;
 option java_package = "gg.grounds.grpc.config";
 option java_outer_classname = "ConfigServiceProto";
 
+// Config snapshot APIs are the source of truth for config consumers.
+//
+// Implementations may also publish best-effort NATS invalidation hints on the subject
+// `config.{app}.{env}.changed` to reduce propagation latency. Consumers must still reconcile
+// through GetSnapshotIfNewer because the NATS event stream is not a durable contract.
+
 // Provides read access to effective configuration snapshots and documents.
 service ConfigService {
   // Returns the full configuration snapshot for the given app/env pair.
