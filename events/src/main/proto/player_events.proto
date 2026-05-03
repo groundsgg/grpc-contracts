@@ -1,0 +1,71 @@
+syntax = "proto3";
+
+package gg.grounds.events.player;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.events.player";
+option java_outer_classname = "PlayerEventsProto";
+
+import "google/protobuf/timestamp.proto";
+
+// PlayerJoined fires when a player successfully completes the Login
+// flow on any Velocity proxy in the platform. The proxy that
+// authenticates the player publishes this — exactly once per
+// session-start.
+//
+// Subject:    presence.player.joined.{playerId}
+// Wildcard:   presence.player.joined.>   (e.g. for stats services)
+// Publisher:  Velocity (plugin-platform-router or plugin-player)
+// Subscriber: service-player (presence cache), plugin-social (notify
+//             friends), plugin-chat (announce in lobby), etc.
+message PlayerJoined {
+  string player_id = 1;       // UUID
+  string player_name = 2;     // Mojang username at join time
+
+  // Which proxy / region this session lives on. Useful for
+  // cross-proxy routing.
+  string proxy_id = 3;        // Velocity instance ID (per-Pod or per-PoP)
+  string region = 4;          // BUNNYNET_MC_REGION-style label
+
+  google.protobuf.Timestamp joined_at = 5;
+}
+
+// PlayerLeft fires when the player disconnects from the proxy.
+// Note: a *transfer* to another proxy fires `PlayerSwitched` (below)
+// rather than left+joined, so subscribers can distinguish "really
+// gone" from "moved".
+//
+// Subject:    presence.player.left.{playerId}
+// Wildcard:   presence.player.left.>
+message PlayerLeft {
+  string player_id = 1;
+  string proxy_id = 2;
+
+  // Optional reason — `client_disconnect`, `kicked`, `timeout`,
+  // `transferred` (rare; usually you'd see PlayerSwitched).
+  optional string reason = 3;
+
+  google.protobuf.Timestamp left_at = 4;
+}
+
+// PlayerSwitched fires when a player moves from one sub-server to
+// another within the same proxy (e.g. Lobby → BedWars-Match-42), or
+// across proxies via a Transfer-Packet. Used by social/chat plugins
+// to keep "what's <player> doing" displays current.
+//
+// Subject:    presence.player.switched.{playerId}
+// Wildcard:   presence.player.switched.>
+message PlayerSwitched {
+  string player_id = 1;
+
+  // Server names as known by Velocity's routing config. Empty `from`
+  // = first server post-Login.
+  string from_server = 2;
+  string to_server = 3;
+
+  // Same as PlayerJoined.proxy_id — relevant if the switch crosses
+  // proxies via Transfer-Packet, otherwise matches.
+  string proxy_id = 4;
+
+  google.protobuf.Timestamp switched_at = 5;
+}

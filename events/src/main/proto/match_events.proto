@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package gg.grounds.events.match;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.events.match";
+option java_outer_classname = "MatchEventsProto";
+
+import "google/protobuf/timestamp.proto";
+
+// MatchStarted fires when a Minigame transitions to its RUNNING
+// phase (see library-minigame-api's GamePhase). Stats-services,
+// Discord-relays, leaderboards subscribe to this to start tracking.
+//
+// Subject:    match.lifecycle.started.{matchId}
+// Wildcard:   match.lifecycle.started.>
+// Publisher:  the game-server hosting the match (via plugin-match
+//             or library-minigame-api's NATS-bridge)
+// Subscriber: service-player (career-stat tracking), plugin-social
+//             (party "playing X" indicator), Discord-relay
+message MatchStarted {
+  string match_id = 1;        // UUID, server-side allocated
+  string minigame_id = 2;     // e.g. "bedwars", "duel-1v1"
+  string variant = 3;         // "casual" | "ranked" | "tournament"
+
+  // The Velocity-Node + Paper-Server-Pod the match is running on.
+  // Useful for service-allocation (who handles transfers if the
+  // server crashes).
+  string server_id = 4;
+
+  // Players + their team assignments at match start. Subsequent
+  // join/leave during the match fires PlayerJoinedMatch /
+  // PlayerLeftMatch (not in this v1 — add when needed).
+  repeated MatchParticipant participants = 5;
+
+  google.protobuf.Timestamp started_at = 6;
+}
+
+// MatchEnded fires when the match transitions to ENDING or CLEANUP.
+// Carries the final state for stats consumers. Stats services use
+// this as the "commit" signal — anything after this is post-game.
+//
+// Subject:    match.lifecycle.ended.{matchId}
+// Wildcard:   match.lifecycle.ended.>
+message MatchEnded {
+  string match_id = 1;
+
+  // Final standings — usually a winner team-id (or empty for
+  // free-for-all-style games).
+  optional string winner_team_id = 2;
+
+  // Per-participant final stats. Subscribers persist these into
+  // their respective stores (career stats, leaderboards, etc.).
+  repeated MatchResult results = 3;
+
+  // How the match terminated. `normal_finish`, `abandoned`,
+  // `server_crashed`, `forfeit`, `tournament_advance`.
+  string termination_reason = 4;
+
+  google.protobuf.Timestamp ended_at = 5;
+}
+
+message MatchParticipant {
+  string player_id = 1;
+  string player_name = 2;
+  string team_id = 3;        // empty for FFA
+}
+
+message MatchResult {
+  string player_id = 1;
+  string team_id = 2;
+  bool victorious = 3;       // simple "did this player's team win"
+
+  // Game-specific stats — minigames serialize their own JSON here
+  // because the schema varies (BedWars: beds_broken; Duel:
+  // hits_landed; etc.). Consumers that care about specific games
+  // parse the JSON, others just store as opaque blob.
+  string game_specific_stats_json = 4;
+}
