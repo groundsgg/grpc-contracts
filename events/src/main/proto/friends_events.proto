@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package gg.grounds.events.friends;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.events.friends";
+option java_outer_classname = "FriendsEventsProto";
+
+import "google/protobuf/timestamp.proto";
+
+// FriendStatusChanged is published per-recipient whenever a player's
+// online state changes — i.e. service-social fans-out one event per
+// friend in the player's list. Each proxy subscribes to the subject
+// for *its locally-connected players* and surfaces the notification
+// in chat.
+//
+// Subject:    friends.status.{recipientPlayerId}
+// Publisher:  service-social (after a presence.player.{joined,left}
+//             event fires, fan-out to each friend's subject)
+// Subscriber: every Velocity proxy, scoped to its local players
+//
+// Why per-recipient subjects instead of fan-out at subscribe:
+// keeps each subscriber's traffic bounded to *its* players' friends,
+// so a proxy with 100 connected players only sees ~100×friends-avg
+// events, not the global firehose.
+//
+// Example subjects:
+//   friends.status.7c9e6679-7425-40de-944b-e07fc1f90ae7
+message FriendStatusChanged {
+  // The friend whose state changed.
+  string friend_id = 1;
+  string friend_name = 2;
+
+  // True = friend just came online, false = just went offline.
+  bool online = 3;
+
+  // Optional: which sub-server is the friend on (so the recipient's
+  // "/friends" UI can show "playing BedWars" instead of just
+  // "online").
+  optional string current_server = 4;
+
+  google.protobuf.Timestamp at = 5;
+}

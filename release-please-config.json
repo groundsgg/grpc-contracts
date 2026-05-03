@@ -12,6 +12,9 @@
     },
     "config": {
       "package-name": "config"
+    },
+    "events": {
+      "package-name": "events"
     }
   }
 }

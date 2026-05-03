@@ -1,0 +1,44 @@
+syntax = "proto3";
+
+package gg.grounds.events.config;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.events.config";
+option java_outer_classname = "ConfigEventsProto";
+
+import "google/protobuf/timestamp.proto";
+
+// ConfigChanged is published whenever a config document is mutated
+// in service-config. Subscribers (services + plugins) re-fetch the
+// snapshot via the gRPC ConfigService when they see this — the event
+// itself does NOT carry the new config payload, only the version.
+//
+// Subject:    config.{app}.{env}.changed
+// Publisher:  service-config (see ConfigChangePublisher.kt)
+// Subscriber: service-* (cache invalidation), plugin-config
+//
+// Example subjects:
+//   config.service-player.prod.changed
+//   config.plugin-social.dev-lusu.changed
+message ConfigChanged {
+  // Application name — typically a service or plugin name
+  // (`service-player`, `plugin-social`, `velocity`, etc.).
+  string app = 1;
+
+  // Deployment environment (`prod`, `dev-lusu`, `staging`, etc.).
+  string env = 2;
+
+  // Monotonic version, increments per change in service-config DB.
+  // Subscribers use this to detect "I already saw this change".
+  int64 version = 3;
+
+  // Optional: which namespace within the app's config tree changed.
+  // Empty = anywhere in the doc.
+  optional string namespace = 4;
+
+  // Optional: the specific key that changed. Empty = whole doc reloaded.
+  optional string config_key = 5;
+
+  // Wall-clock timestamp the change was committed in service-config.
+  google.protobuf.Timestamp timestamp = 6;
+}
