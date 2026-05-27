@@ -1,0 +1,99 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.gameserver;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.gameserver";
+option java_outer_classname = "GameserverProto";
+
+// GameserverService is the typed wrapper around the Agones GameServer
+// lifecycle that game-pods (Paper, Minestom, etc.) use to signal
+// readiness, request labels, and shut down cleanly.
+//
+// Why a typed service instead of using the Agones SDK directly:
+// upgrades. The Agones Go-SDK's wire format and method shape can
+// shift between Agones versions; this gRPC API stays stable, and
+// service-gameserver internally adapts. Plugin code stops caring
+// about Agones-SDK-version drift.
+//
+// Identity: every call carries the pod's projected ServiceAccount-JWT
+// (audience=grounds-services); service-gameserver derives the
+// GameServer name from the calling Pod's identity, so callers don't
+// have to thread a GameServer-name through the API.
+service GameserverService {
+
+  // Signal the GameServer is Ready (Agones state transition from
+  // `Scheduled` → `Ready`). Idempotent. Equivalent to the Agones
+  // SDK's `SDK.Ready()`.
+  rpc Ready(ReadyRequest) returns (ReadyReply);
+
+  // Initiate graceful shutdown. Agones marks the GameServer as
+  // `Shutdown` and removes the Pod after drain. Equivalent to
+  // `SDK.Shutdown()`.
+  rpc Shutdown(ShutdownRequest) returns (ShutdownReply);
+
+  // Set or update a key/value label on the GameServer. Labels are
+  // used by FleetAutoscaler match-filtering and the Allocator API
+  // (e.g. label `gamemode=duels.ranked`, then the allocator
+  // requests servers matching that label).
+  rpc SetLabel(SetLabelRequest) returns (SetLabelReply);
+
+  // Allocate a GameServer matching the supplied label-selector.
+  // Restricted role — only callers identified as
+  // `system:plugin:matchmaking` (or platform-admin) may call this.
+  // The platform's Velocity proxy uses this when it wants a fresh
+  // server for an incoming match.
+  rpc Allocate(AllocateRequest) returns (AllocateReply);
+}
+
+message ReadyRequest {}
+
+message ReadyReply {
+  // True if the transition actually happened. False = already in
+  // Ready state (no-op).
+  bool transitioned = 1;
+}
+
+message ShutdownRequest {
+  // Optional grace period in seconds. Server caps at 60. If unset,
+  // Agones's default is used (typically immediate).
+  optional int32 grace_period_seconds = 1;
+}
+
+message ShutdownReply {
+  bool acknowledged = 1;
+}
+
+message SetLabelRequest {
+  // Label key. Server-side prefix `gg.grounds/` is enforced — callers
+  // can only set labels in that prefix.
+  string key = 1;
+  string value = 2;
+}
+
+message SetLabelReply {
+  // True when the value changed; false when the label was already
+  // at that value (no-op).
+  bool changed = 1;
+}
+
+message AllocateRequest {
+  // Label selector — Agones-MatchLabels semantics. All entries must
+  // match.
+  map<string, string> selector = 1;
+  // Optional fleet-name hint. If set, only GameServers in that Fleet
+  // are considered; if unset, every Ready GameServer in the env is.
+  optional string fleet_name = 2;
+}
+
+message AllocateReply {
+  // True if an allocation succeeded. False = no GameServer matching
+  // the selector was Ready in the env.
+  bool found = 1;
+  // Allocated GameServer's pod identity (empty when !found).
+  string game_server_name = 2;
+  // Network address the caller (e.g. Velocity) routes traffic to.
+  // Empty when !found.
+  string address = 3;
+  int32 port = 4;
+}

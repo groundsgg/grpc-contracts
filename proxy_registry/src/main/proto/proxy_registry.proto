@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.proxy_registry;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.proxy_registry";
+option java_outer_classname = "ProxyRegistryProto";
+
+import "google/protobuf/timestamp.proto";
+
+// ProxyRegistryService is the typed wrapper around Velocity's backend
+// registry. Backend Minecraft servers (Paper, Minestom) register
+// themselves with the env's Velocity instance via this API, send
+// heartbeats while alive, and drain when shutting down.
+//
+// Today this is plugin-platform-router watching Agones GameServer
+// CRDs and pushing entries into Velocity directly. Wrapping it as a
+// typed service lets us swap the underlying mechanism (Agones-watch,
+// k8s-Service-discovery, a dedicated registry DB) without touching
+// every game-pod.
+//
+// Identity: every call carries the pod's projected ServiceAccount-JWT;
+// service-proxy-registry uses it to scope each backend's entries to
+// the calling pod's project + env.
+service ProxyRegistryService {
+
+  // Register a backend in the env's Velocity gateway. Idempotent —
+  // re-registering with the same backend_name updates the address.
+  rpc Register(RegisterRequest) returns (RegisterReply);
+
+  // Heartbeat — keeps a backend's registration fresh. Backends that
+  // miss N heartbeats are GC'd. Velocity stops routing new
+  // connections to GC'd backends; existing sessions stay until they
+  // disconnect naturally.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatReply);
+
+  // Drain — graceful removal from rotation. Velocity stops routing
+  // new connections to this backend; existing sessions are
+  // transferred to other backends or dropped, depending on the
+  // family's drain-policy.
+  rpc Drain(DrainRequest) returns (DrainReply);
+}
+
+message RegisterRequest {
+  // Logical backend name. Stable identity for re-registration; uniqueness
+  // is scoped to (project, env). Example: "duels-server-7c9e".
+  string backend_name = 1;
+
+  // Backend family this server joins. Velocity routes player
+  // connections to families via virtual-host matching:
+  //   - `lobby`           → players entering the env
+  //   - `duels`, `bedwars`, ... → specific gamemode backends
+  string family = 2;
+
+  // Connection target. Velocity dials backend Minecraft TCP on this
+  // address:port. Inside a per-env k8s namespace this is typically
+  // a Service-DNS name or pod-IP:port.
+  string address = 3;
+  int32 port = 4;
+
+  // Optional labels for matchmaking-style routing. Forwarded as-is
+  // to consumers (e.g. plugin-match queries by `gamemode=duels.ranked`).
+  map<string, string> labels = 5;
+}
+
+message RegisterReply {
+  // True when the registration was newly added; false when it was a
+  // refresh of an existing entry.
+  bool created = 1;
+  // Server-assigned ID, stable across re-registrations. Echo this on
+  // Heartbeat / Drain.
+  string registration_id = 2;
+}
+
+message HeartbeatRequest {
+  string registration_id = 1;
+  // Optional: current player count, for capacity-aware routing.
+  optional int32 connected_players = 2;
+}
+
+message HeartbeatReply {
+  bool registered = 1;
+  // True if this backend has been Drain'd by the operator while we
+  // weren't looking — caller should initiate its own graceful drain.
+  bool drain_requested = 2;
+}
+
+message DrainRequest {
+  string registration_id = 1;
+  // Optional grace period in seconds before forced removal. Caps
+  // server-side at 600 (10 minutes).
+  optional int32 grace_period_seconds = 2;
+}
+
+message DrainReply {
+  bool acknowledged = 1;
+  // When the forced-removal will fire if the backend doesn't
+  // unregister on its own.
+  google.protobuf.Timestamp evict_at = 2;
+}

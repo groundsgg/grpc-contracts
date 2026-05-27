@@ -25,6 +25,8 @@ jobs:
           - config
           - events
           - leaderboard
+          - gameserver
+          - proxy_registry
           - sdk
     steps:
       - name: Checkout

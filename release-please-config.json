@@ -19,6 +19,12 @@
     "leaderboard": {
       "package-name": "leaderboard"
     },
+    "gameserver": {
+      "package-name": "gameserver"
+    },
+    "proxy_registry": {
+      "package-name": "proxy_registry"
+    },
     "sdk": {
       "package-name": "sdk"
     }
