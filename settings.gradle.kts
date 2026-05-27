@@ -1,3 +1,3 @@
 rootProject.name = "library-grpc-contracts"
 
-include("player", "status", "config", "events", "sdk")
+include("player", "status", "config", "events", "leaderboard", "sdk")

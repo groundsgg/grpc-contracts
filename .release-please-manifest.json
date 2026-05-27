@@ -3,5 +3,6 @@
   "status": "0.1.0",
   "config": "0.2.0",
   "events": "1.0.0",
+  "leaderboard": "0.0.0",
   "sdk": "0.0.0"
 }
