@@ -16,6 +16,9 @@
     "events": {
       "package-name": "events"
     },
+    "leaderboard": {
+      "package-name": "leaderboard"
+    },
     "sdk": {
       "package-name": "sdk"
     }

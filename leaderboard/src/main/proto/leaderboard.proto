@@ -1,0 +1,142 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.leaderboard;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.leaderboard";
+option java_outer_classname = "LeaderboardProto";
+
+import "google/protobuf/timestamp.proto";
+
+// LeaderboardService owns persistent player rankings per board.
+// A board is identified by (board_id, season_id) — board_id is a
+// stable string per gamemode (e.g. "duels", "bedwars"), season_id
+// rolls over on a schedule defined by ops (typically every 8 weeks
+// in sync with the Battle-Pass cadence).
+//
+// Backed by Postgres for cold-storage + history, with a Valkey
+// sorted-set hot-cache on read paths (added post-MVP). Each
+// SubmitScore call updates both atomically.
+//
+// First domain-service to ship under the v2.2 Service Architecture
+// — see Confluence page 216662019.
+service LeaderboardService {
+
+  // Submit a score for a player on a board. Delta semantics:
+  // - REPLACE  → set the player's score to `score`, overwriting
+  // - ACCUMULATE → add `score` to the player's current value
+  //                (typical for playtime, win-counts)
+  // - MAX      → keep the higher of current and `score`
+  //              (typical for personal-best scores)
+  rpc SubmitScore (SubmitScoreRequest) returns (SubmitScoreReply);
+
+  // Return the top N entries on a board, optionally pinning to a
+  // specific season. If season_id is empty, returns the current season.
+  rpc GetTop (GetTopRequest) returns (GetTopReply);
+
+  // Return a single player's rank and score on a board. Returns
+  // {found: false} when the player has never submitted a score
+  // for this (board, season).
+  rpc GetPlayerRank (GetPlayerRankRequest) returns (GetPlayerRankReply);
+
+  // Roll over to a new season — moves the current scores into the
+  // immutable history table, clears the hot board for new entries.
+  // Admin-only (server-side ACL).
+  rpc SeasonReset (SeasonResetRequest) returns (SeasonResetReply);
+}
+
+enum SubmitMode {
+  SUBMIT_MODE_UNSPECIFIED = 0;
+  SUBMIT_MODE_REPLACE = 1;
+  SUBMIT_MODE_ACCUMULATE = 2;
+  SUBMIT_MODE_MAX = 3;
+}
+
+message SubmitScoreRequest {
+  // Logical board ID. Stable per gamemode/mode-variant.
+  // Examples: "duels", "duels.ranked", "bedwars.solos".
+  string board_id = 1;
+
+  // Player UUID (Mojang format, with dashes).
+  string player_id = 2;
+
+  // Score value. Interpretation depends on `mode`.
+  int64 score = 3;
+
+  SubmitMode mode = 4;
+
+  // Optional: pin to a specific season. Empty → current season,
+  // resolved server-side from the season-config table.
+  optional string season_id = 5;
+
+  // Optional client-side idempotency token; same value within ~10min
+  // is deduped. Stops double-submit on retry.
+  optional string idempotency_key = 6;
+}
+
+message SubmitScoreReply {
+  // Effective score after the submit (post-mode-application).
+  int64 effective_score = 1;
+  // The player's rank on the current board after this update.
+  // 1-indexed. 0 = not on the board.
+  int32 rank = 2;
+  // The season the submission was attributed to.
+  string season_id = 3;
+  // True if this submit was a duplicate (idempotency_key match).
+  bool deduplicated = 4;
+}
+
+message GetTopRequest {
+  string board_id = 1;
+
+  // Number of top entries to return. Capped server-side at 1000.
+  int32 limit = 2;
+
+  // Optional. Empty → current season.
+  optional string season_id = 3;
+}
+
+message GetTopReply {
+  repeated LeaderboardEntry entries = 1;
+  string season_id = 2;
+}
+
+message GetPlayerRankRequest {
+  string board_id = 1;
+  string player_id = 2;
+  optional string season_id = 3;
+}
+
+message GetPlayerRankReply {
+  bool found = 1;
+  // 1-indexed rank. 0 when `found` is false.
+  int32 rank = 2;
+  int64 score = 3;
+  string season_id = 4;
+}
+
+message SeasonResetRequest {
+  string board_id = 1;
+  // The id of the season being closed. Idempotent — if the season
+  // is already closed, the call returns success without doing work.
+  string season_id = 2;
+  // The id of the new season to begin.
+  string new_season_id = 3;
+}
+
+message SeasonResetReply {
+  // True if this call actually closed the season. False if the
+  // call was a no-op (season already closed).
+  bool closed = 1;
+  // Number of entries that were archived from the hot board.
+  int32 archived_entries = 2;
+}
+
+message LeaderboardEntry {
+  // 1-indexed rank within the board.
+  int32 rank = 1;
+  string player_id = 2;
+  int64 score = 3;
+  // When this player last updated their score.
+  google.protobuf.Timestamp last_updated = 4;
+}

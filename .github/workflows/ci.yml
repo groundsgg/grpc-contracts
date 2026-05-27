@@ -24,6 +24,7 @@ jobs:
           - status
           - config
           - events
+          - leaderboard
           - sdk
     steps:
       - name: Checkout
