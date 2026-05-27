@@ -12,10 +12,12 @@ repositories {
 }
 
 val grpcVersion = "1.68.1"
+val natsVersion = "2.20.5"
 
 dependencies {
     api("io.grpc:grpc-stub:$grpcVersion")
     api("io.grpc:grpc-protobuf:$grpcVersion")
+    api("io.nats:jnats:$natsVersion")
     implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
 
     testImplementation(platform("org.junit:junit-bom:5.11.3"))
