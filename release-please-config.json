@@ -15,6 +15,9 @@
     },
     "events": {
       "package-name": "events"
+    },
+    "sdk": {
+      "package-name": "sdk"
     }
   }
 }
