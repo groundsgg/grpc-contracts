@@ -1,6 +1,5 @@
 package gg.grounds.sdk
 
-import io.nats.client.AuthHandler
 import io.nats.client.Nats
 import io.nats.client.Options
 import java.nio.file.Files
@@ -46,7 +45,26 @@ object GroundsEvents {
         val url =
             System.getenv("NATS_URL")
                 ?: throw IllegalStateException("Missing NATS_URL env var — forge should inject this")
+        val credsPath = System.getenv("NATS_CREDS_FILE")
+        val tokenPath = System.getenv("GROUNDS_TOKEN_FILE") ?: DEFAULT_TOKEN_PATH
+        return GroundsEventsClient(Nats.connect(buildOptions(url, credsPath, tokenPath)))
+    }
 
+    /**
+     * Builds the NATS connection options. Extracted from [connect] so the
+     * auth wiring can be unit-tested without a live broker.
+     *
+     * The projected SA-Token is sent as the NATS **bearer** in the
+     * `auth_token` CONNECT field via [Options.Builder.tokenSupplier]. This
+     * MUST be tokenSupplier, NOT an `AuthHandler`: jnats serializes an
+     * AuthHandler's `getJWT()` into the CONNECT `jwt` field, but the
+     * auth-callout responder (service-nats-authz `AuthRequest`) reads
+     * `connect_opts.auth_token` and rejects any connect that omits it.
+     * tokenSupplier is invoked on every (re)connect, so a kubelet token
+     * rotation (the file changes in-place) is picked up without locking us
+     * to a stale token.
+     */
+    internal fun buildOptions(url: String, credsPath: String?, tokenPath: String): Options {
         val opts =
             Options.Builder()
                 .server(url)
@@ -54,38 +72,14 @@ object GroundsEvents {
                 .reconnectWait(Duration.ofSeconds(2))
                 .connectionTimeout(Duration.ofSeconds(5))
 
-        val credsPath = System.getenv("NATS_CREDS_FILE")
-        val tokenPath = System.getenv("GROUNDS_TOKEN_FILE") ?: DEFAULT_TOKEN_PATH
-
         if (!credsPath.isNullOrBlank() && Files.exists(Path.of(credsPath))) {
+            // Legacy / local-dev path: a .creds blob (nkey + user JWT).
             opts.authHandler(Nats.credentials(credsPath))
         } else if (Files.exists(Path.of(tokenPath))) {
-            // Re-read the file on every reconnect — the kubelet rotates
-            // projected SA-Tokens well before they expire (~10min default
-            // TTL) and the file content changes in-place. Connecting once
-            // with a captured byte[] would lock us to the stale token.
-            opts.authHandler(BearerTokenFileAuthHandler(Path.of(tokenPath)))
+            val token = Path.of(tokenPath)
+            opts.tokenSupplier { Files.readString(token).trim().toCharArray() }
         }
 
-        return GroundsEventsClient(Nats.connect(opts.build()))
-    }
-
-    /**
-     * Reads the bearer token from a file on every CONNECT. NATS calls
-     * `getJWT()` once per reconnect cycle, so we don't need to cache;
-     * disk I/O once per ~minute (reconnect cadence) is free.
-     *
-     * Returns the token in the `JWT` slot of the CONNECT proto, which
-     * is what NATS forwards to the auth-callout service's
-     * `connect_opts.auth_token` field. The NKey/signing fields stay
-     * null — auth-callout doesn't use them.
-     */
-    private class BearerTokenFileAuthHandler(private val tokenFile: Path) : AuthHandler {
-        override fun getID(): CharArray = CharArray(0)
-
-        override fun sign(nonce: ByteArray?): ByteArray = ByteArray(0)
-
-        override fun getJWT(): CharArray =
-            Files.readString(tokenFile).trim().toCharArray()
+        return opts.build()
     }
 }
