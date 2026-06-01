@@ -5,6 +5,7 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import java.nio.file.Files
 
 /**
  * Pure unit tests covering env-var resolution. Wire-level publish +
@@ -39,6 +40,28 @@ class GroundsEventsConfigTest {
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("NATS_URL")
             .hasMessageContaining("forge")
+    }
+
+    @Test
+    fun `SA-token bearer is sent in the auth_token CONNECT field, not jwt`() {
+        // Regression guard for the B3 bearer bug: an AuthHandler.getJWT()
+        // lands the token in the CONNECT `jwt` field, but service-nats-authz
+        // reads connect_opts.auth_token. The token must go in auth_token.
+        val tokenFile = Files.createTempFile("grounds-token", "")
+        Files.writeString(tokenFile, "  sa-token-xyz\n") // padded → verifies trim
+        try {
+            val options =
+                GroundsEvents.buildOptions("nats://localhost:4222", null, tokenFile.toString())
+            val connect =
+                options
+                    .buildProtocolConnectOptionsString("nats://localhost:4222", true, null)
+                    .toString()
+
+            assertThat(connect).contains("\"auth_token\":\"sa-token-xyz\"")
+            assertThat(connect).doesNotContain("\"jwt\"")
+        } finally {
+            Files.deleteIfExists(tokenFile)
+        }
     }
 
     @Test
