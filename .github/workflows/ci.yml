@@ -25,6 +25,7 @@ jobs:
           - config
           - events
           - leaderboard
+          - match
           - gameserver
           - proxy_registry
           - sdk
