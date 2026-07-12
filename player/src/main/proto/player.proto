@@ -10,10 +10,29 @@ service PlayerPresenceService {
   rpc TryPlayerLogin (PlayerLoginRequest) returns (PlayerLoginReply);
   rpc PlayerLogout (PlayerLogoutRequest) returns (PlayerLogoutReply);
   rpc PlayerHeartbeatBatch (PlayerHeartbeatBatchRequest) returns (PlayerHeartbeatBatchReply);
+
+  // Session lookup. A proxy only knows the players connected to *itself*, so a
+  // feature that spans proxies (a private message, a party invite) has to ask
+  // the presence service who a name belongs to and whether they are still on.
+  rpc GetPlayerSession (GetPlayerSessionRequest) returns (GetPlayerSessionReply);
+  rpc ResolvePlayerName (ResolvePlayerNameRequest) returns (ResolvePlayerNameReply);
+
+  // Prefix search for tab-complete. Deliberately NOT "list all online players":
+  // clients call this per keystroke, and at 10k players a full list would be
+  // both a large response and a table scan. The server caps the result count.
+  rpc SuggestPlayerNames (SuggestPlayerNamesRequest) returns (SuggestPlayerNamesReply);
+
+  // Follows a player across backend servers so the session knows where they are.
+  rpc UpdatePlayerServer (UpdatePlayerServerRequest) returns (UpdatePlayerServerReply);
 }
 
 message PlayerLoginRequest {
   string player_id = 1;
+  // The name + proxy the player is logging in on. Empty is tolerated (an older
+  // plugin-player build): the session is still created, it just can't be found
+  // by name until the player reconnects against a newer proxy.
+  string player_name = 2;
+  string proxy_id = 3;
 }
 
 message PlayerLoginReply {
@@ -40,6 +59,55 @@ message PlayerHeartbeatBatchReply {
   string message = 3;
   // success is true when the request is valid and processed; false for invalid requests or server errors.
   bool success = 4;
+}
+
+message PlayerSessionInfo {
+  string player_id = 1;
+  string player_name = 2;
+  // The proxy the player is connected to, and the backend server they are on.
+  // Either may be empty: a session created by an older plugin-player carries no
+  // proxy, and a player who has not reached a backend yet is on no server.
+  string proxy_id = 3;
+  string server_name = 4;
+  int64 connected_at_millis = 5;
+}
+
+message GetPlayerSessionRequest {
+  string player_id = 1;
+}
+
+message GetPlayerSessionReply {
+  bool found = 1;
+  PlayerSessionInfo session = 2;
+}
+
+message ResolvePlayerNameRequest {
+  // Matched case-insensitively — Minecraft names are unique, casing is not.
+  string player_name = 1;
+}
+
+message ResolvePlayerNameReply {
+  bool found = 1;
+  PlayerSessionInfo session = 2;
+}
+
+message SuggestPlayerNamesRequest {
+  string prefix = 1;
+  // Server clamps this to its own maximum; 0 means "use the default".
+  int32 limit = 2;
+}
+
+message SuggestPlayerNamesReply {
+  repeated string player_names = 1;
+}
+
+message UpdatePlayerServerRequest {
+  string player_id = 1;
+  string server_name = 2;
+}
+
+message UpdatePlayerServerReply {
+  bool updated = 1;
 }
 
 enum LoginStatus {
