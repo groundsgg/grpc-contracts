@@ -53,6 +53,18 @@ service MatchService {
   // path, never exposed to game clients. There is no hot-reload:
   // the next queue tick picks up the new config.
   rpc UpsertQueue (UpsertQueueRequest) returns (UpsertQueueReply);
+
+  // Report how a match ended. The gamemode calls this when the match
+  // is over; it is what moves the ratings.
+  //
+  // Idempotent: the durable store keys rating updates on
+  // (match_id, player_id), so a retry after a timeout is a no-op
+  // rather than a double rating change. Gamemodes should retry.
+  //
+  // Whether the result actually rates is decided at match-formation
+  // time from the mode config, never from this call — so an
+  // ephemeral test workspace cannot pollute the ladder.
+  rpc ReportMatchResult (ReportMatchResultRequest) returns (ReportMatchResultReply);
 }
 
 // ---------------------------------------------------------------
@@ -214,4 +226,42 @@ message BandConfig {
 
 message UpsertQueueReply {
   bool created = 1;
+}
+
+// ---------------------------------------------------------------
+// Results
+// ---------------------------------------------------------------
+
+message PlayerResult {
+  string player_id = 1;
+
+  // 1-based finishing position, lower is better. Ties are expressed by
+  // repeating a placement (two players both placed 1st).
+  //
+  // Weng-Lin needs a *ranking*, not a win/loss bit: without a placement
+  // a multi-team result degrades to winner-vs-rest, which biases the
+  // ladder. For a 1v1 the winner is 1 and the loser is 2.
+  int32 placement = 2;
+}
+
+message ReportMatchResultRequest {
+  // Must be a match this service formed. An unknown id is rejected
+  // rather than invented — a match record is written at claim time, so
+  // there is no legitimate way to report a result for a match that
+  // never existed.
+  string match_id = 1;
+
+  repeated PlayerResult results = 2;
+
+  // `normal_finish`, `abandoned`, `forfeit`, `server_crashed`, ...
+  // Free-form; stored for operators, not interpreted.
+  string termination_reason = 3;
+}
+
+message ReportMatchResultReply {
+  // False when this result had already been recorded — the call was a
+  // retry. Not an error.
+  bool applied = 1;
+  // True if the match was ranked and ratings actually moved.
+  bool rated = 2;
 }
