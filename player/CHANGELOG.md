@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.2.0...player@v0.3.0) (2026-07-12)
+
+
+### Features
+
+* **player:** session lookup by name, id and prefix ([#68](https://github.com/groundsgg/library-grpc-contracts/issues/68)) ([a4089a0](https://github.com/groundsgg/library-grpc-contracts/commit/a4089a065b638e8967d44e809692a546efe3b5b1))
+
 ## [0.2.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.1.0...player@v0.2.0) (2026-03-08)
 
 
