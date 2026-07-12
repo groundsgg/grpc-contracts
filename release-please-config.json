@@ -19,6 +19,9 @@
     "leaderboard": {
       "package-name": "leaderboard"
     },
+    "match": {
+      "package-name": "match"
+    },
     "gameserver": {
       "package-name": "gameserver"
     },

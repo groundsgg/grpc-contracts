@@ -1,0 +1,217 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.match;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.match";
+option java_outer_classname = "MatchProto";
+
+// MatchService is the central matchmaker: players queue per
+// (project, mode, region), the service forms MMR-based matches,
+// allocates an Agones GameServer in the target cluster and routes
+// the players there via Velocity.
+//
+// The same messages travel two transports:
+//   - NATS request-reply at the vCluster edge (subjects
+//     `match.v1.<project>.<region>.{enqueue,cancel,ticket.get}`),
+//     which is how the Velocity proxy talks to us. Project and
+//     region are derived from the SUBJECT, never from the payload —
+//     forge stamps both as pinned literals into the proxy's broker
+//     grant, so a client cannot forge either one.
+//   - gRPC for central service-to-service calls (portal,
+//     leaderboard, forge).
+//
+// Correctness model (see the design doc): at-most-once assignment
+// per player and at-most-one match per ticket are absolute; Agones
+// allocation is at-least-once with adopt-dedup plus a reaper.
+service MatchService {
+
+  // Put a player in the queue for a mode. Returns a ticket the
+  // caller polls (or waits for on the assignment subject).
+  // Rejected if the player already holds a live ticket anywhere —
+  // one live ticket per player, worldwide.
+  rpc Enqueue (EnqueueRequest) returns (EnqueueReply);
+
+  // Withdraw a ticket. Only succeeds while the ticket is still
+  // QUEUED — once a match has formed, the ticket is committed.
+  rpc CancelTicket (CancelTicketRequest) returns (CancelTicketReply);
+
+  // Current state of a ticket. This is the source of truth on
+  // reconnect: the assignment push over NATS is only a wakeup,
+  // the ticket hash is the truth.
+  rpc GetTicket (GetTicketRequest) returns (GetTicketReply);
+
+  // A player's rating for a mode. Ratings are global and
+  // player-scoped — there is no per-region ladder.
+  rpc GetRating (GetRatingRequest) returns (GetRatingReply);
+
+  // Queue depth and wait estimates, for UI.
+  rpc GetQueueStats (QueueStatsRequest) returns (QueueStatsReply);
+
+  // Upsert a mode's matchmaking config. Called by forge on deploy
+  // from the `matchmaking:` block in grounds.yaml — trusted server
+  // path, never exposed to game clients. There is no hot-reload:
+  // the next queue tick picks up the new config.
+  rpc UpsertQueue (UpsertQueueRequest) returns (UpsertQueueReply);
+}
+
+// ---------------------------------------------------------------
+// Enqueue / cancel / poll
+// ---------------------------------------------------------------
+
+message EnqueueRequest {
+  // Player UUID (Keycloak identity, stable across sessions).
+  string player_id = 1;
+
+  // Mode within the project, e.g. "mobrush".
+  string mode_id = 2;
+
+  // Proxy location the player is connected to, e.g. "de-fra1".
+  // A QoS hint only: it steers which cluster inside the region
+  // hosts the match. It is NEVER a queue dimension and NEVER a
+  // security boundary — a wrong hint costs the player latency and
+  // nothing else. The queue a ticket lands in is decided solely by
+  // the region derived from the subject.
+  optional string location = 3;
+
+  // NOTE: no project and no region field, on purpose. Both are
+  // derived from the NATS subject (or the caller's identity on the
+  // gRPC path). Putting them in the payload would let a client
+  // queue into another project or region.
+}
+
+message EnqueueReply {
+  string ticket_id = 1;
+  // The player's current mu for this mode, so the client can show
+  // a rating without a second round-trip.
+  double mu = 2;
+  int32 queue_position = 3;
+}
+
+message CancelTicketRequest {
+  string ticket_id = 1;
+  // Checked against the ticket's owner — a player can only cancel
+  // their own ticket.
+  string player_id = 2;
+}
+
+message CancelTicketReply {
+  // False when the ticket was already past QUEUED (a match had
+  // formed) or did not exist.
+  bool cancelled = 1;
+}
+
+message GetTicketRequest {
+  string ticket_id = 1;
+}
+
+message GetTicketReply {
+  TicketState state = 1;
+  // Set exactly when state == ASSIGNED.
+  Assignment assignment = 2;
+  int32 queue_depth = 3;
+  int32 est_wait_seconds = 4;
+}
+
+enum TicketState {
+  TICKET_STATE_UNSPECIFIED = 0;
+  QUEUED = 1;
+  MATCHED = 2;
+  ASSIGNED = 3;
+  CANCELLED = 4;
+  FAILED = 5;
+}
+
+message Assignment {
+  string match_id = 1;
+  string game_server_name = 2;
+  // address:port is the fallback route — the Velocity routing
+  // pipeline (GameServer -> proxy backend -> routable name) has not
+  // yet run fully e2e in fresh bundles, so the raw endpoint ships
+  // alongside the name.
+  string address = 3;
+  int32 port = 4;
+  repeated string ticket_ids = 5;
+  // Server-stamped. The region the match is played in — equals the
+  // region stamped into the match at claim time.
+  string region = 6;
+}
+
+// ---------------------------------------------------------------
+// Ratings
+// ---------------------------------------------------------------
+
+message GetRatingRequest {
+  string player_id = 1;
+  string mode_id = 2;
+  // No region field: ratings are global.
+}
+
+message GetRatingReply {
+  // Weng-Lin (OpenSkill) rating. Defaults: mu=25.0, sigma=25/3.
+  double mu = 1;
+  double sigma = 2;
+  // Conservative display rating, mu - 3*sigma.
+  double display = 3;
+  int32 games_played = 4;
+}
+
+// ---------------------------------------------------------------
+// Queue stats + config
+// ---------------------------------------------------------------
+
+message QueueStatsRequest {
+  string mode_id = 1;
+}
+
+message QueueStatsReply {
+  int32 tickets_queued = 1;
+  int32 est_wait_seconds = 2;
+  // False when the mode has no enabled region right now.
+  bool available = 3;
+}
+
+// Per-region hosting config for a mode.
+message RegionConfig {
+  bool enabled = 1;
+  // Agones fleet to allocate from, in that region.
+  string fleet_name = 2;
+}
+
+message UpsertQueueRequest {
+  string mode_id = 1;
+
+  // n = team_size * team_count players per match.
+  int32 team_size = 2;
+  int32 team_count = 3;
+
+  // Whether results move ratings. forge sets this true only for
+  // release-target deployments, so ephemeral test workspaces cannot
+  // pollute the ladder. Decided at match-formation time, never by
+  // the result event.
+  bool ranked = 4;
+
+  // Banding parameters (see design §4). Zero means "use default".
+  //   band(t) = max(b0, k*sigma) + w*floor(waitSec/s)
+  BandConfig band = 5;
+
+  // Region literal -> hosting config. Regions are a closed set in
+  // code (platform, eu, na, ap); the cluster set behind each region
+  // is dynamic and lives in the registry.
+  map<string, RegionConfig> regions = 6;
+}
+
+message BandConfig {
+  double b0 = 1;
+  double k = 2;
+  double w = 3;
+  int32 s_seconds = 4;
+  // After this wait the anchor's band goes unbounded (whole ladder).
+  int32 mercy_seconds = 5;
+  // After this wait the anchor stops requiring mutual band overlap.
+  int32 mutual_seconds = 6;
+}
+
+message UpsertQueueReply {
+  bool created = 1;
+}
