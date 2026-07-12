@@ -265,3 +265,68 @@ message ReportMatchResultReply {
   // True if the match was ranked and ratings actually moved.
   bool rated = 2;
 }
+
+// ---------------------------------------------------------------
+// The other direction: the matchmaker pushes a match to the server
+// ---------------------------------------------------------------
+
+// MatchHost is implemented by the GAME SERVER, not by the matchmaker.
+// The direction of every other call in this file is reversed here: the
+// matchmaker is the client, the game server is the server.
+//
+// A Minestom runtime hosts many matches at once, each its own instance,
+// so a server is never "taken" — it just has fewer free slots. Once the
+// matchmaker has claimed a slot on one (an Agones counter increment), it
+// has to tell that server which players are coming, because nothing else
+// will: the server cannot infer a match from a player walking in, and by
+// then it would be too late to build the arena anyway.
+//
+// So the match is PUSHED, and the arena is ready before the players are
+// routed. The alternative — the server asking on first join — makes the
+// first player wait for a world to load and gives the server no way to
+// know who else it is waiting for.
+service MatchHost {
+
+  // Prepare a match. The server builds the arena, reserves the slots and
+  // waits for the players; the matchmaker routes them immediately after.
+  //
+  // MUST be idempotent on match_id. The matchmaker retries — a lost reply
+  // is indistinguishable from a lost call — and a second Start for a match
+  // the server is already hosting is a retry, not a new match. Answer
+  // `accepted` for it; building the arena twice would strand the first one.
+  //
+  // A server that cannot take the match (out of room, shutting down)
+  // should say so rather than accept and drop it: the matchmaker then puts
+  // the players back on the queue with the wait they had already earned,
+  // which is a few seconds' delay instead of a match that never starts.
+  rpc StartMatch (StartMatchRequest) returns (StartMatchReply);
+}
+
+message MatchTeam {
+  // Player UUIDs, as drafted. A free-for-all is N teams of one.
+  repeated string player_ids = 1;
+}
+
+message StartMatchRequest {
+  // The id everything else is keyed on — the same one the server must
+  // quote back in ReportMatchResult when the match ends.
+  string match_id = 1;
+
+  // Which game to build. The server may host several modes.
+  string mode_id = 2;
+
+  // Teams in draft order. The matchmaker has already balanced them; the
+  // server must not re-shuffle, or the ratings it reports afterwards will
+  // describe a different match than the one that was rated.
+  repeated MatchTeam teams = 3;
+}
+
+message StartMatchReply {
+  // True when the server has the match — including when it already had it
+  // (a retry). False means it will not host it, and the matchmaker puts
+  // the players back on the queue.
+  bool accepted = 1;
+
+  // Why not. Free-form, for operators.
+  string reason = 2;
+}
