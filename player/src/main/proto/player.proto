@@ -25,6 +25,17 @@ service PlayerPresenceService {
   // Follows a player across backend servers so the session knows where they are.
   rpc UpdatePlayerServer (UpdatePlayerServerRequest) returns (UpdatePlayerServerReply);
 
+  // Turns player ids back into names, for players who are NOT online.
+  //
+  // The session table is presence: the row is deleted on logout, so a name only exists
+  // while the player is connected. Anything that outlives a session — a leaderboard, a
+  // match history, a ban list — could therefore only ever show a raw uuid. This reads a
+  // separate, never-deleted name index written at every login.
+  //
+  // Batched on purpose: a leaderboard page needs ten names at once, and ten round-trips
+  // to render one screen is not a thing worth building.
+  rpc LookupPlayerNames (LookupPlayerNamesRequest) returns (LookupPlayerNamesReply);
+
   // How many players are on each backend server, network-wide.
   //
   // Velocity can only count the players connected to the proxy asking, so with two
@@ -109,6 +120,16 @@ message SuggestPlayerNamesRequest {
 
 message SuggestPlayerNamesReply {
   repeated string player_names = 1;
+}
+
+message LookupPlayerNamesRequest {
+  repeated string player_ids = 1;
+}
+
+message LookupPlayerNamesReply {
+  // player id -> last name that player logged in with. A player we have never seen is
+  // simply absent, rather than mapped to a placeholder every caller would have to know.
+  map<string, string> names = 1;
 }
 
 message UpdatePlayerServerRequest {
