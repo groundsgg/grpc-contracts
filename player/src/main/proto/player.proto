@@ -35,6 +35,16 @@ service PlayerPresenceService {
   // Batched on purpose: a leaderboard page needs ten names at once, and ten round-trips
   // to render one screen is not a thing worth building.
   rpc LookupPlayerNames (LookupPlayerNamesRequest) returns (LookupPlayerNamesReply);
+
+  // How many players are on each backend server, network-wide.
+  //
+  // Velocity can only count the players connected to the proxy asking, so with two
+  // proxies in front of one lobby each of them reports half of it. Anything that
+  // states a number about the network — /agones, a server selector — has to ask here.
+  //
+  // An aggregate, not a roster: the reply is one row per occupied backend server, so
+  // it stays small at any player count (contrast SuggestPlayerNames above).
+  rpc CountPlayersByServer (CountPlayersByServerRequest) returns (CountPlayersByServerReply);
 }
 
 message PlayerLoginRequest {
@@ -129,6 +139,24 @@ message UpdatePlayerServerRequest {
 
 message UpdatePlayerServerReply {
   bool updated = 1;
+}
+
+message CountPlayersByServerRequest {}
+
+message ServerPlayerCount {
+  string server_name = 1;
+  int32 players = 2;
+}
+
+message CountPlayersByServerReply {
+  // One entry per backend server that has at least one player on it. A server nobody
+  // is on is absent rather than zero — the caller already knows its own server list,
+  // and can show the ones it did not hear about as empty.
+  repeated ServerPlayerCount servers = 1;
+
+  // Everyone online network-wide. Counts players who have not reached a backend server
+  // yet, so it can exceed the sum of `servers`.
+  int32 total = 2;
 }
 
 enum LoginStatus {
