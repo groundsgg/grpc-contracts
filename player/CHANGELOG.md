@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.3.0...player@v0.4.0) (2026-07-21)
+
+
+### Features
+
+* **player:** count online players per backend server ([#71](https://github.com/groundsgg/library-grpc-contracts/issues/71)) ([6e1b6ee](https://github.com/groundsgg/library-grpc-contracts/commit/6e1b6eedc8d85c4b0f5f5e14cdb26c17b4676c97))
+* **player:** LookupPlayerNames — turn ids back into names after logout ([#72](https://github.com/groundsgg/library-grpc-contracts/issues/72)) ([c7cec5e](https://github.com/groundsgg/library-grpc-contracts/commit/c7cec5eeec3cba3325b116949d983b1bdb3b4d3c))
+
 ## [0.3.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.2.0...player@v0.3.0) (2026-07-12)
 
 
