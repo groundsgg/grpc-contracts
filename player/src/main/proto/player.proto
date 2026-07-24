@@ -45,6 +45,18 @@ service PlayerPresenceService {
   // An aggregate, not a roster: the reply is one row per occupied backend server, so
   // it stays small at any player count (contrast SuggestPlayerNames above).
   rpc CountPlayersByServer (CountPlayersByServerRequest) returns (CountPlayersByServerReply);
+
+  // How many players are on each proxy, network-wide, and which region each
+  // proxy is in.
+  //
+  // A separate call from CountPlayersByServer rather than another field on its
+  // reply: the two group the same players along different axes and no caller
+  // wants both. /agones asks which backend servers are busy; /online asks how
+  // the network is spread across proxies and regions.
+  //
+  // Also an aggregate: one row per occupied proxy, so it stays small however
+  // many players are online.
+  rpc CountPlayersByProxy (CountPlayersByProxyRequest) returns (CountPlayersByProxyReply);
 }
 
 message PlayerLoginRequest {
@@ -54,6 +66,14 @@ message PlayerLoginRequest {
   // by name until the player reconnects against a newer proxy.
   string player_name = 2;
   string proxy_id = 3;
+  // Which region the proxy is in (`nl-ams1`). Empty from a proxy that does not
+  // declare one, and empty is a legitimate answer rather than an error: the
+  // session is still created, it just cannot say where the player is.
+  //
+  // Carried here rather than derived from proxy_id. Proxy ids are pod names,
+  // which are unique but say nothing about place, and recovering a region by
+  // splitting a string is exactly the coupling this field exists to avoid.
+  string region = 4;
 }
 
 message PlayerLoginReply {
@@ -91,6 +111,10 @@ message PlayerSessionInfo {
   string proxy_id = 3;
   string server_name = 4;
   int64 connected_at_millis = 5;
+  // Where the proxy is. Empty for a session created before the proxy declared a
+  // region, so a reader must treat "unknown" as a normal case rather than an
+  // error — sessions outlive a rollout.
+  string region = 6;
 }
 
 message GetPlayerSessionRequest {
@@ -139,6 +163,27 @@ message UpdatePlayerServerRequest {
 
 message UpdatePlayerServerReply {
   bool updated = 1;
+}
+
+message CountPlayersByProxyRequest {}
+
+message ProxyPlayerCount {
+  string proxy_id = 1;
+  // Empty when the session predates the proxy declaring a region.
+  string region = 2;
+  int32 players = 3;
+}
+
+message CountPlayersByProxyReply {
+  // One entry per proxy holding at least one player. A proxy nobody is on is
+  // absent rather than zero: an idle proxy is not interesting, and the caller
+  // cannot enumerate proxies anyway.
+  repeated ProxyPlayerCount proxies = 1;
+
+  // Everyone online network-wide, which equals the sum of `proxies` — every
+  // session belongs to exactly one proxy, unlike backend servers where a player
+  // may be on none yet.
+  int32 total = 2;
 }
 
 message CountPlayersByServerRequest {}
