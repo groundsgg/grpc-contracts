@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.4.0...player@v0.5.0) (2026-07-24)
+
+
+### Features
+
+* **player:** carry the region in a session, and count players by proxy ([#74](https://github.com/groundsgg/library-grpc-contracts/issues/74)) ([0751527](https://github.com/groundsgg/library-grpc-contracts/commit/07515275f82fff8aa41a02e10b8e0f4fb3649166))
+
 ## [0.4.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.3.0...player@v0.4.0) (2026-07-21)
 
 
