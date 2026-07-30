@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.5.0...player@v0.6.0) (2026-07-30)
+
+
+### Features
+
+* **player:** add GetPlayerLocale / SetPlayerLocale RPCs ([#76](https://github.com/groundsgg/library-grpc-contracts/issues/76)) ([fd7855a](https://github.com/groundsgg/library-grpc-contracts/commit/fd7855ab61b63930d17d5e7c8ef4641a996503fb))
+
 ## [0.5.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.4.0...player@v0.5.0) (2026-07-24)
 
 
