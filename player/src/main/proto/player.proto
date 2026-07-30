@@ -57,6 +57,14 @@ service PlayerPresenceService {
   // Also an aggregate: one row per occupied proxy, so it stays small however
   // many players are online.
   rpc CountPlayersByProxy (CountPlayersByProxyRequest) returns (CountPlayersByProxyReply);
+
+  // A player's chosen interface language, stored against the durable player row
+  // (the never-deleted name index), so it survives logout and reconnects. Set by
+  // the in-game /lang command; read on join to seed the proxy's cache. Absent is
+  // a normal answer — the player has never chosen one, and the client's announced
+  // locale is used instead.
+  rpc GetPlayerLocale (GetPlayerLocaleRequest) returns (GetPlayerLocaleReply);
+  rpc SetPlayerLocale (SetPlayerLocaleRequest) returns (SetPlayerLocaleReply);
 }
 
 message PlayerLoginRequest {
@@ -202,6 +210,26 @@ message CountPlayersByServerReply {
   // Everyone online network-wide. Counts players who have not reached a backend server
   // yet, so it can exceed the sum of `servers`.
   int32 total = 2;
+}
+
+message GetPlayerLocaleRequest {
+  string player_id = 1;
+}
+
+message GetPlayerLocaleReply {
+  // BCP-47 / Java locale tag, e.g. "de" or "de-DE". Empty when the player has
+  // set no preference — the caller falls back to the client's announced locale.
+  string locale = 1;
+}
+
+message SetPlayerLocaleRequest {
+  string player_id = 1;
+  // The language tag to store. An empty value clears the preference.
+  string locale = 2;
+}
+
+message SetPlayerLocaleReply {
+  bool updated = 1;
 }
 
 enum LoginStatus {
