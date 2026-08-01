@@ -7,6 +7,12 @@ option java_package = "gg.grounds.grpc.player";
 option java_outer_classname = "PlayerProto";
 
 service PlayerPresenceService {
+  // Creates the session, or takes it over: a login that carries a different
+  // proxy_id than the live session replaces it. That is what a proxy-to-proxy
+  // transfer looks like from here — the client reconnects on the next proxy
+  // while the old session is still heartbeat-fresh, and refusing it as
+  // "already online" would strand every transferred player. Same proxy_id and
+  // fresh is still rejected as already online.
   rpc TryPlayerLogin (PlayerLoginRequest) returns (PlayerLoginReply);
   rpc PlayerLogout (PlayerLogoutRequest) returns (PlayerLogoutReply);
   rpc PlayerHeartbeatBatch (PlayerHeartbeatBatchRequest) returns (PlayerHeartbeatBatchReply);
@@ -91,6 +97,11 @@ message PlayerLoginReply {
 
 message PlayerLogoutRequest {
   string player_id = 1;
+  // The proxy this logout is coming from. When set, the session is only
+  // removed while it still belongs to that proxy — a disconnect that raced a
+  // transfer must not delete the session the *next* proxy just created.
+  // Empty (an older plugin-player build) removes unconditionally, as before.
+  string proxy_id = 2;
 }
 
 message PlayerLogoutReply {
