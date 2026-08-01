@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.6.0...player@v0.7.0) (2026-08-01)
+
+
+### Features
+
+* **player:** proxy-scoped logout + takeover semantics for TryPlayerLogin ([#78](https://github.com/groundsgg/library-grpc-contracts/issues/78)) ([603ebe0](https://github.com/groundsgg/library-grpc-contracts/commit/603ebe03b84b6c715a55d3d51084f798a58c463d))
+
 ## [0.6.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.5.0...player@v0.6.0) (2026-07-30)
 
 
