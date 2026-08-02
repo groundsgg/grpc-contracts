@@ -319,6 +319,22 @@ message StartMatchRequest {
   // server must not re-shuffle, or the ratings it reports afterwards will
   // describe a different match than the one that was rated.
   repeated MatchTeam teams = 3;
+
+  // Which map to play, as service-maps addresses it — `<namespace>/<name>`,
+  // e.g. `bedwars/4-4-platzangst`. Note a namespace may itself contain a
+  // slash (`u/<creator>/<name>`), so this is one opaque string.
+  //
+  // The matchmaker picks it, for the same reason it picks the teams: every
+  // server in a fleet is interchangeable, so a server choosing its own map
+  // would make "which map" depend on which pod happened to be allocated.
+  // Picking it here also makes map rotation, per-region pools and taking a
+  // broken map out of circulation matchmaker concerns rather than a
+  // redeploy of every game server.
+  //
+  // Empty means the matchmaker has no map for this mode. A server that
+  // needs one should refuse the match rather than invent one; a server
+  // that does not (a duel arena it builds itself) ignores the field.
+  string map_address = 4;
 }
 
 message StartMatchReply {
