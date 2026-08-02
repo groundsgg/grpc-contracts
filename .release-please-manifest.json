@@ -7,5 +7,6 @@
   "match": "0.0.0",
   "gameserver": "0.0.0",
   "proxy_registry": "0.0.0",
-  "sdk": "0.0.0"
+  "sdk": "0.0.0",
+  "coins": "0.0.0"
 }

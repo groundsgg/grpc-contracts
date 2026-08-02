@@ -1,0 +1,236 @@
+syntax = "proto3";
+
+package gg.grounds.grpc.coins;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.grpc.coins";
+option java_outer_classname = "CoinsProto";
+
+import "google/protobuf/timestamp.proto";
+
+// CoinsService owns the network-wide player currency ("Coins") and
+// everything a Coin can be spent on.
+//
+// Two rules shape this contract, and both are enforced by what is
+// *missing* from it:
+//
+//  1. Coins are earned, never bought. There is no way to create Coins
+//     from real money, and no way to turn them back into anything with
+//     real-world value — no cash-out, no transfer between players, no
+//     export. This is what keeps the currency outside the Minecraft
+//     Commercial Usage Guidelines' monetisation rules entirely.
+//
+//  2. Game servers do not mint. There is deliberately no AddCoins RPC.
+//     A game-server pod runs player-facing code and is the weakest
+//     trust boundary in the platform; if it could name an amount, the
+//     currency would be worth exactly as much as the least-hardened
+//     minigame. Credits are derived inside service-coins from
+//     authoritative events (MatchEnded, presence.*) against rules held
+//     in service-config.
+//
+// The absence of `AddCoins`, `SetBalance` and `Transfer` is the
+// security measure. Adding any of them is a design change, not a
+// feature.
+//
+// Backed by Postgres on core (EU): a materialised `wallet` balance plus
+// an append-only `ledger`, written in one transaction. A purchase debits
+// the wallet and grants the entitlement in that same transaction, which
+// is why entitlements live here rather than in a separate service.
+service CoinsService {
+
+  // A player's current balance. Always served from the primary — a
+  // balance is the textbook case for library-data-access's @Fresh:
+  // a stale balance is not old, it is wrong. Callers are expected to
+  // ask on join, after their own writes, and on invalidation events,
+  // not on every tick.
+  rpc GetBalance (GetBalanceRequest) returns (GetBalanceReply);
+
+  // The player's own journal, newest first, cursor-paged. Backs
+  // "/coins verlauf" and support requests of the form "why do I have
+  // 40 fewer Coins than yesterday".
+  rpc GetHistory (GetHistoryRequest) returns (GetHistoryReply);
+
+  // The purchasable catalogue, filtered to what is currently on offer.
+  // Each entry carries whether the requesting player already owns it,
+  // so a shop GUI needs one call rather than two.
+  rpc GetCatalog (GetCatalogRequest) returns (GetCatalogReply);
+
+  // Buy one catalogue entry. Debit and grant happen in a single
+  // database transaction; either the player has the item and the Coins
+  // are gone, or neither happened.
+  //
+  // `idempotency_key` is required, not optional: a retry on a purchase
+  // without one is a second purchase.
+  //
+  // Errors: INVALID_ARGUMENT (malformed ids, missing key),
+  // NOT_FOUND (unknown or withdrawn SKU),
+  // ALREADY_EXISTS (player already owns it),
+  // FAILED_PRECONDITION (insufficient balance, unmet unlock condition).
+  rpc Purchase (PurchaseRequest) returns (PurchaseReply);
+
+  // Everything a player owns. Read by the cosmetics plugin on join.
+  rpc GetEntitlements (GetEntitlementsRequest) returns (GetEntitlementsReply);
+
+  // Credit or debit a player by hand, with a reason. Admin-only
+  // (server-side ACL, see AuthGuard). Every adjustment is journalled
+  // with the calling subject as `actor`, so no balance can change
+  // without an attributable row.
+  rpc AdminAdjust (AdminAdjustRequest) returns (AdminAdjustReply);
+}
+
+// ---------------------------------------------------------------- reads
+
+message GetBalanceRequest {
+  // Player UUID (Mojang format, with dashes).
+  string player_id = 1;
+}
+
+message GetBalanceReply {
+  int64 balance = 1;
+  // Everything this player has ever earned, ignoring what they spent.
+  // Drives "Coins verdient"-style profile stats without a journal scan.
+  int64 lifetime_earned = 2;
+}
+
+message GetHistoryRequest {
+  string player_id = 1;
+
+  // Page size. Capped server-side at 100.
+  int32 limit = 2;
+
+  // Cursor: return entries strictly older than this ledger id. Empty
+  // (0) starts at the newest entry.
+  int64 before_id = 3;
+}
+
+message GetHistoryReply {
+  repeated LedgerEntry entries = 1;
+  // Cursor for the next page, or 0 when the journal is exhausted.
+  int64 next_before_id = 2;
+}
+
+message LedgerEntry {
+  int64 id = 1;
+  // Signed: positive credits, negative debits. Never zero.
+  int64 amount = 2;
+  // The player's balance immediately after this entry was written.
+  int64 balance_after = 3;
+  // Machine-readable cause: "match.win", "match.loss", "playtime",
+  // "shop.purchase", "admin.grant", "admin.revoke".
+  string reason = 4;
+  // What the entry points at: a match id, a SKU, a support ticket.
+  // Includes the earn-rule version for match credits
+  // ("{matchId}#rules:7"), so an old payout stays explainable after
+  // the rules change.
+  string reference = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+// ---------------------------------------------------------------- shop
+
+message GetCatalogRequest {
+  // Whose ownership flags to resolve. Required — the catalogue is
+  // always rendered for somebody.
+  string player_id = 1;
+
+  // Optional category filter, e.g. "cosmetic.trail". Empty returns
+  // every available entry.
+  string category = 2;
+
+  // Include entries that are no longer on offer. Only useful for
+  // admin tooling; a shop passes false.
+  bool include_unavailable = 3;
+}
+
+message GetCatalogReply {
+  repeated CatalogEntry entries = 1;
+  // The requesting player's balance, so a shop can render prices
+  // as affordable/unaffordable without a second call.
+  int64 balance = 2;
+}
+
+message CatalogEntry {
+  // Stable identifier, e.g. "cosmetic.trail.ember". This is what
+  // Purchase takes and what entitlements are keyed by.
+  string sku = 1;
+
+  // Category from a fixed server-side allowlist. New categories are
+  // added by migration, never by an RPC, because the allowlist is how
+  // "Coins only buy cosmetics" is enforced rather than merely stated.
+  string category = 2;
+
+  int64 price = 3;
+
+  bool available = 4;
+
+  // Whether the requesting player already owns this.
+  bool owned = 5;
+
+  // Optional unlock condition; 0 means none.
+  int32 min_level = 6;
+
+  // Presentation data as JSON: i18n key for the display name, icon,
+  // sort order. Opaque to the service — the plugin renders it.
+  string metadata_json = 7;
+}
+
+message PurchaseRequest {
+  string player_id = 1;
+  string sku = 2;
+
+  // Required. Same key within the retention window returns the
+  // original outcome instead of buying twice.
+  string idempotency_key = 3;
+}
+
+message PurchaseReply {
+  // Balance after the debit.
+  int64 balance = 1;
+  // What the player paid, at the price read inside the transaction —
+  // never the price the client believed.
+  int64 price_paid = 2;
+  // True when this call matched a previous idempotency key and
+  // changed nothing.
+  bool deduplicated = 3;
+}
+
+message GetEntitlementsRequest {
+  string player_id = 1;
+  // Optional category filter; empty returns everything owned.
+  string category = 2;
+}
+
+message GetEntitlementsReply {
+  repeated Entitlement entitlements = 1;
+}
+
+message Entitlement {
+  string sku = 1;
+  string category = 2;
+  google.protobuf.Timestamp granted_at = 3;
+  // How it was acquired: "purchase", "admin", "reward:<id>".
+  string granted_by = 4;
+}
+
+// ---------------------------------------------------------------- admin
+
+message AdminAdjustRequest {
+  string player_id = 1;
+
+  // Signed. Positive credits, negative debits. Zero is rejected —
+  // an adjustment that changes nothing is a mistake, not a no-op.
+  int64 amount = 2;
+
+  // Free-text justification, stored in the journal's `reference`.
+  // Required: an unexplained balance change is indistinguishable
+  // from an incident.
+  string reason = 3;
+
+  // Required, same semantics as Purchase.
+  string idempotency_key = 4;
+}
+
+message AdminAdjustReply {
+  int64 balance = 1;
+  bool deduplicated = 2;
+}
