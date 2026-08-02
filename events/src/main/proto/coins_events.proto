@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package gg.grounds.events.coins;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.events.coins";
+option java_outer_classname = "CoinsEventsProto";
+
+import "google/protobuf/timestamp.proto";
+
+// BalanceChanged fires after a wallet write has been committed.
+//
+// This is a *notification*, not the record of truth: that is the ledger
+// row in Postgres. The message exists so that caches can be
+// dropped and a scoreboard can update without polling. Core NATS,
+// best effort — a lost message costs a stale display until the next
+// read, never a lost Coin.
+//
+// Subject:    coins.balance.changed.{playerId}
+// Wildcard:   coins.balance.changed.>
+// Publisher:  service-coins, after COMMIT
+// Subscriber: plugin-coins (session-cache invalidation + toast)
+message BalanceChanged {
+  string player_id = 1;
+
+  // The balance now. Consumers should overwrite rather than apply
+  // `delta` to what they hold: messages can arrive out of order, and
+  // an absolute value converges where an increment does not.
+  int64 new_balance = 2;
+
+  // Signed movement that caused this. For display only ("+25 Coins").
+  int64 delta = 3;
+
+  // Same vocabulary as the ledger: "match.win", "shop.purchase", …
+  string reason = 4;
+
+  google.protobuf.Timestamp changed_at = 5;
+}
+
+// EntitlementGranted fires when a player gains something they own —
+// through purchase, an admin grant, or a reward.
+//
+// Subject:    coins.entitlement.granted.{playerId}
+// Wildcard:   coins.entitlement.granted.>
+// Publisher:  service-coins, after COMMIT
+// Subscriber: the cosmetics plugin (make it selectable without a
+//             reconnect), plugin-coins (shop GUI refresh)
+message EntitlementGranted {
+  string player_id = 1;
+  string sku = 2;
+  string category = 3;
+  google.protobuf.Timestamp granted_at = 4;
+}
