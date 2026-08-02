@@ -30,9 +30,6 @@
     },
     "sdk": {
       "package-name": "sdk"
-    },
-    "coins": {
-      "package-name": "coins"
     }
   }
 }
