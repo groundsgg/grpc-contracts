@@ -88,9 +88,6 @@ message PlayerLoginRequest {
   // which are unique but say nothing about place, and recovering a region by
   // splitting a string is exactly the coupling this field exists to avoid.
   string region = 4;
-  // Which client the player is on. UNSPECIFIED from an older plugin-player,
-  // and legitimately so — see PlayerPlatform.
-  PlayerPlatform platform = 5;
 }
 
 message PlayerLoginReply {
@@ -137,10 +134,6 @@ message PlayerSessionInfo {
   // region, so a reader must treat "unknown" as a normal case rather than an
   // error — sessions outlive a rollout.
   string region = 6;
-  // Which client the player is on. UNSPECIFIED for a session created before
-  // this field existed; a reader that also holds the player's UUID can recover
-  // it without asking anyone — see PlayerPlatform.
-  PlayerPlatform platform = 7;
 }
 
 message GetPlayerSessionRequest {
@@ -248,29 +241,6 @@ message SetPlayerLocaleRequest {
 
 message SetPlayerLocaleReply {
   bool updated = 1;
-}
-
-// Which Minecraft client a player is on.
-//
-// A Bedrock player reaches the network through Geyser, which translates their
-// session to the Java protocol — so by the time anything here sees them they
-// are an ordinary Java-protocol player, and nothing about the connection says
-// otherwise. It still matters: Bedrock renders inventory-based UI differently,
-// and some of it is unusable there.
-//
-// UNSPECIFIED is a normal answer, not an error. Sessions outlive a rollout, so
-// one created before this field existed carries no platform. A reader that also
-// holds the player's UUID can recover it without asking anyone: Floodgate
-// derives a Bedrock player's UUID from their XUID and zeroes the high bits, so
-//
-//   uuid.getMostSignificantBits() == 0
-//
-// is true for Bedrock players and for no real Java UUID. That is the fallback,
-// and it is why this field is a convenience rather than the only source.
-enum PlayerPlatform {
-  PLAYER_PLATFORM_UNSPECIFIED = 0;
-  PLAYER_PLATFORM_JAVA = 1;
-  PLAYER_PLATFORM_BEDROCK = 2;
 }
 
 enum LoginStatus {
