@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.7.0...player@v0.8.0) (2026-08-13)
+
+
+### Features
+
+* **player:** carry which client a player is on ([#84](https://github.com/groundsgg/library-grpc-contracts/issues/84)) ([328ed76](https://github.com/groundsgg/library-grpc-contracts/commit/328ed767e78426692c4a392fc1a35ba1359aadc3))
+
 ## [0.7.0](https://github.com/groundsgg/library-grpc-contracts/compare/player@v0.6.0...player@v0.7.0) (2026-08-01)
 
 
