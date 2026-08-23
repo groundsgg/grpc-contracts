@@ -16,6 +16,7 @@ events/src/main/proto/
 ├── player_events.proto    # presence.{join,leave,switch}
 ├── friends_events.proto   # friends.status.{playerId}
 ├── match_events.proto     # match.{lifecycle,started,ended}.{matchId}
+├── analytics_events.proto # analytics.{proxy,game}.<name>
 └── README.md (this)
 ```
 
@@ -30,6 +31,12 @@ Beispiele:
 - `presence.player.joined.<playerId>` — domain=presence, entity=player, action=joined, scope=playerId
 - `friends.status.<playerId>` — domain=friends, entity=status, scope=playerId (no action — Subject *is* the change-feed)
 - `match.lifecycle.started.<matchId>` — domain=match, entity=lifecycle, action=started, scope=matchId
+- `analytics.game.player.death` — domain=analytics, scope=source, dann der Event-Name selbst
+
+`analytics_events.proto` bricht die Konvention bewusst: dort ist der
+Event-Name Teil des Subjects statt eine eigene Message, weil die
+Vokabular-Erweiterung dort der Normalfall ist und kein Release-Zug davor
+stehen soll. Details im Proto-Kommentar.
 
 **Wildcard-Subscribe**: `match.lifecycle.>` für alle Match-Lifecycle-Events.
 
