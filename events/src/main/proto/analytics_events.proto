@@ -1,0 +1,114 @@
+syntax = "proto3";
+
+package gg.grounds.events.analytics;
+
+option java_multiple_files = true;
+option java_package = "gg.grounds.events.analytics";
+option java_outer_classname = "AnalyticsEventsProto";
+
+import "google/protobuf/timestamp.proto";
+
+// Analytics is deliberately ONE open envelope rather than a message per
+// event type. The other files here describe events that a consumer must
+// react to, so their shape is a contract and a new field is a negotiation.
+// Analytics events are written to a column store and read by a human with
+// a query — a new event kind is a new `name` plus new `attrs` keys, and
+// nothing downstream needs a redeploy to carry it. Adding a proto message
+// per player action would put a release train in front of every question
+// somebody wants to ask.
+//
+// The cost of that choice, stated plainly: nothing validates `name` or the
+// `attrs` keys. Producers own the vocabulary; `docs/analytics-events.md`
+// in plugin-analytics is the list, and a typo there is a column of nulls in
+// Grafana rather than a compile error.
+//
+// Subject:    analytics.<source>.<name>
+//               analytics.proxy.player.join
+//               analytics.game.player.death
+//             `source` is `proxy` (Velocity) or `game` (Minestom/Paper).
+//             `name` is the event name verbatim — its dots are subject
+//             separators, which is what makes `analytics.game.player.>`
+//             a usable filter.
+// Wildcard:   analytics.>            (grounds-clickhouse-writer)
+//             analytics.proxy.>      (anything that only cares about sessions)
+// Publisher:  plugin-analytics, on both the proxy and the game server
+// Subscriber: grounds-clickhouse-writer -> ClickHouse analytics.player_events
+message AnalyticsEvent {
+  // Idempotency key. JetStream redelivers on any ack timeout, and the
+  // ClickHouse table is a ReplacingMergeTree keyed on this, so a redelivered
+  // event collapses instead of double-counting. UUIDv4 from the producer.
+  string event_id = 1;
+
+  // Dotted, lowercase, `<domain>.<action>`: `player.join`, `player.death`,
+  // `shop.purchase`. Becomes a LowCardinality column, so treat it as a small
+  // closed set that grows on purpose — not a free-text label.
+  string name = 2;
+
+  // When the action happened on the producing node, not when it was written.
+  // The writer stamps its own ingest time separately, so clock skew between
+  // regions stays visible instead of being silently corrected.
+  google.protobuf.Timestamp occurred_at = 3;
+
+  // Who. `player_id` is the Mojang UUID in canonical dashed form. Both are
+  // empty for events that are not about a player (`server.start`).
+  string player_id = 4;
+  string player_name = 5;
+
+  // Ties every event of one proxy session together, across server switches
+  // and across the proxy/game split — the game server learns it from the
+  // proxy via a plugin message. Without it, "what did this session do" is a
+  // guess built from timestamps.
+  string session_id = 6;
+
+  // Where. `environment` is `stage` or `prod`; `region` is the satellite
+  // label (`de-fra1`). Every panel in Grafana slices on at least one of
+  // these, so a producer that leaves them empty produces rows that no
+  // dashboard shows.
+  string environment = 7;
+  string region = 8;
+  string proxy_id = 9;
+
+  // The backend server as Velocity names it, or the game server's own pod
+  // name. Empty while the player is still in the login flow.
+  string server = 10;
+
+  // Set only for events that happen inside a match. `minigame_id` matches
+  // the id used by service-match (`bedwars`), and `match_id` is the same
+  // UUID that match_events.proto carries — that is the join key between
+  // this table and analytics.match_events.
+  string minigame_id = 11;
+  string match_id = 12;
+
+  // The event's own payload, split by what a query wants to do with it.
+  //
+  // `attrs` is grouped and filtered on: `cause=fall`, `platform=bedrock`,
+  // `from_server=lobby-1`. Keys land in a ClickHouse Map with a
+  // LowCardinality key type, so keep the key set small; the VALUES may be
+  // high-cardinality, the KEYS may not.
+  //
+  // `metrics` is summed and averaged: `session_ms=421000`, `damage=6.5`.
+  // Kept apart from `attrs` so a panel can SUM without parsing a string —
+  // stuffing numbers into `attrs` is the single most common way to make a
+  // dashboard impossible to write later.
+  map<string, string> attrs = 13;
+  map<string, double> metrics = 14;
+
+  // `<artifact>@<version>`, e.g. `plugin-analytics/velocity@1.0.0`. When a
+  // dashboard goes strange after a rollout, this is the column that says
+  // which build produced the strange rows.
+  string producer = 15;
+}
+
+// Events always travel batched, even when the batch holds one.
+//
+// The proxy produces a handful of events per player session; a game server
+// produces thousands per minute. One NATS message per event would put the
+// firehose and the trickle on the same code path and let the firehose set
+// the cost. Producers buffer per subject and flush on a size or time bound,
+// so a batch always holds events of the same `name`.
+//
+// A batch is acked as a unit. The writer inserts every row before acking,
+// and `event_id` makes a redelivered batch harmless.
+message AnalyticsBatch {
+  repeated AnalyticsEvent events = 1;
+}
