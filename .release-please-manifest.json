@@ -3,7 +3,7 @@
   "status": "0.1.0",
   "config": "0.2.0",
   "events": "1.0.0",
-  "leaderboard": "0.0.0",
+  "leaderboard": "1.0.0",
   "match": "0.0.0",
   "gameserver": "0.0.0",
   "proxy_registry": "0.0.0",
