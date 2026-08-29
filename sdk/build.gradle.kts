@@ -11,7 +11,7 @@ repositories {
     mavenCentral()
 }
 
-val grpcVersion = "1.68.1"
+val grpcVersion = "1.81.0"
 // 2.21.4+ for Options.Builder.tokenSupplier (sends the bearer in the
 // `auth_token` CONNECT field, re-read per reconnect). Pinned to 2.25.3 to
 // match service-nats-authz's jnats so client + auth-callout server agree.
