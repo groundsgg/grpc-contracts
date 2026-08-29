@@ -23,7 +23,7 @@ dependencies {
     api("io.nats:jnats:$natsVersion")
     implementation("io.grpc:grpc-netty-shaded:$grpcVersion")
 
-    testImplementation(platform("org.junit:junit-bom:5.11.3"))
+    testImplementation(platform("org.junit:junit-bom:6.1.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("org.assertj:assertj-core:3.26.3")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
