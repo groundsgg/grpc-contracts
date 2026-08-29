@@ -5,7 +5,7 @@
   "events": "1.1.0",
   "leaderboard": "0.0.0",
   "match": "0.0.0",
-  "gameserver": "0.0.0",
+  "gameserver": "1.0.0",
   "proxy_registry": "0.0.0",
   "sdk": "0.0.0"
 }
